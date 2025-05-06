@@ -41,7 +41,7 @@ export default function SortableItem({
       {...listeners}
       className={`
         flex items-center justify-between
-        w-full p-4 mb-2 rounded-md border
+        w-full p-3 mb-[10px] rounded-md border
         ${colorClass}
         bg-neutral-900
       `}

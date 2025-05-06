@@ -16,3 +16,22 @@ body {
     color: var(--foreground);
     font-family: "Inter", sans-serif;
 }
+
+@keyframes fade-out {
+    0% {
+        opacity: 1;
+        background-color: rgb(181, 57, 57);
+    }
+    85% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+.flashHud {
+  opacity: 0;
+  animation-duration: 3s;
+  animation-name: fade-out;
+}

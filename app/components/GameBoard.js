@@ -1,7 +1,10 @@
-import { DndContext, closestCenter } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-import SortableItem from './SortableItem'
+import { DndContext, closestCenter } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import SortableItem from "./SortableItem";
 
 export default function GameBoard({
   items,
@@ -11,11 +14,16 @@ export default function GameBoard({
   gameOver,
   revealInProgress,
   revealStep,
-  showCorrectView
+  showCorrectView,
 }) {
   return (
-    <main className="w-full max-w-md">
-      <div className="text-xs text-center text-neutral-500 pb-4">(Earliest)</div>
+    <main className="flex flex-col w-full max-w-md text-xs">
+      <div className="w-full flex pb-3 gap-2 items-center text-neutral-300">
+        Earliest
+        <div className="grow">
+          <div className="w-full h-[1px] bg-neutral-600" />
+        </div>
+      </div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -37,7 +45,12 @@ export default function GameBoard({
           ))}
         </SortableContext>
       </DndContext>
-      <div className="text-xs text-center text-neutral-500 pt-2">(Latest)</div>
+      <div className="w-full flex pb-3 gap-2 items-center text-neutral-300">
+        <div className="grow">
+          <div className="w-full h-[1px] bg-neutral-600" />
+        </div>
+        Latest
+      </div>
     </main>
-  )
+  );
 }
