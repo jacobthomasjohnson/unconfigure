@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { correctOrder, inventionDates } from '@/utils/data'
+import { Grip } from 'lucide-react';
 
 export default function SortableItem({
   id,
@@ -28,7 +29,7 @@ export default function SortableItem({
       ? 'text-green-500 border-green-500'
       : status === 'incorrect'
         ? 'text-red-500 border-red-500'
-        : 'border-neutral-400'
+        : 'border-neutral-600'
 
   return (
     <div
@@ -43,10 +44,11 @@ export default function SortableItem({
         flex items-center justify-between
         w-full p-3 mb-[10px] rounded-md border
         ${colorClass}
-        bg-neutral-900
+        bg-neutral-900 hover:cursor-grab active:cursor-grabbing
       `}
     >
       <span className="text-xs font-medium">{id}</span>
+      {!isRevealed && <span className="text-[#444444]"><Grip width={14} height={14} /></span>}
 
       {isRevealed && (
         <span className="text-xs text-neutral-300">

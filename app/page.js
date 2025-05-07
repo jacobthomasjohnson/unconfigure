@@ -23,7 +23,6 @@ export default function UnorderPage() {
   const [viewMode, setViewMode] = useState("guess");
   const hudTimeoutRef = useRef(null);
 
-
   useEffect(() => {
     setItems(shuffle(correctOrder));
   }, []);
@@ -40,23 +39,23 @@ export default function UnorderPage() {
   const hudMessage = (msg) => {
     const hud = document.getElementById("hud");
     if (!hud) return;
-  
+
     // Clear any existing timeout
     if (hudTimeoutRef.current) {
       clearTimeout(hudTimeoutRef.current);
       hud.classList.remove("flashHud"); // Reset class to allow re-trigger
       void hud.offsetWidth; // Force reflow to restart animation
     }
-  
+
     hud.innerText = msg;
     hud.classList.add("flashHud");
-  
+
     hudTimeoutRef.current = setTimeout(() => {
       hud.classList.remove("flashHud");
       hudTimeoutRef.current = null;
     }, 3000);
   };
-  
+
 
   const handleSubmit = () => {
     const isCorrect = items.every((item, i) => item === correctOrder[i]);
@@ -118,13 +117,12 @@ export default function UnorderPage() {
 
   return (
     <div
-      className={`h-full flex flex-col transition-colors ${
-        flash ? "bg-[rgb(181, 57, 57)]" : "bg-neutral-50 dark:bg-neutral-900"
-      }`}
+      className={`h-full flex flex-col transition-colors ${flash ? "bg-[rgb(181, 57, 57)]" : "bg-neutral-50 dark:bg-neutral-900"
+        }`}
     >
       <div
         id="hud"
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+        className="fixed bottom-12 left-1/2 -translate-x-1/2 -translate-y-1/2 
              pointer-events-none text-neutral-200 bg-[#222222] 
              border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity 
              text-sm font-mono whitespace-nowrap w-auto max-w-[90vw]"
