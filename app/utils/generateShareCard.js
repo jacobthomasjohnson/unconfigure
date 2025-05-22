@@ -1,21 +1,19 @@
 import { MAX_GUESSES } from './constants'
-import { correctOrder } from './data'
 
-export default function generateShareCard(allGuesses) {
-      // Header line
-      const header = `Today's Unconfigure Results:`
+export default function generateShareCard (allGuesses, correctOrder) {
+  const normalize = str => str.trim().toLowerCase()
 
-      // One line per guess, numbered with total attempts
-      const lines = allGuesses.map(({ guess }, idx) => {
-            // build the emoji string
-            const emojis = guess
-                  .map((v, i) => (v === correctOrder[i] ? '🟩' : '🟥'))
-                  .join('')
+  const header = `My Unconfigure Results from Today!`
 
-            // prefix with "attempt/total:"
-            return `${idx + 1}/${MAX_GUESSES}: ${emojis}`
-      })
+  const lines = allGuesses.map(({ guess }, idx) => {
+    const emojis = guess
+      .map((val, i) =>
+        normalize(val) === normalize(correctOrder[i]) ? '🟩' : '🟥'
+      )
+      .join('')
 
-      // join header + body
-      return [header, ...lines].join('\n')
+    return `${idx + 1}/${MAX_GUESSES}: ${emojis}`
+  })
+
+  return [header, ...lines].join('\n')
 }

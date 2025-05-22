@@ -1,12 +1,12 @@
-import { DndContext, closestCenter } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import SortableItem from "./SortableItem";
+'use client'
 
-export default function GameBoard({
+import { useState } from 'react'
+import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import SortableItem from './SortableItem'
+
+export default function GameBoard ({
   items,
   sensors,
   onDragEnd,
@@ -15,19 +15,31 @@ export default function GameBoard({
   revealInProgress,
   revealStep,
   showCorrectView,
+  correctOrder,
+  inventionDates
 }) {
+  const [activeId, setActiveId] = useState(null)
+
   return (
-    <main className="flex flex-col w-full max-w-md text-xs">
-      <div className="w-full flex pb-3 gap-2 items-center text-neutral-300">
-        Earliest
-        <div className="grow">
-          <div className="w-full h-[1px] bg-neutral-600" />
+    <main
+      className='flex flex-col w-full max-w-md text-sm'
+      style={{ touchAction: 'manipulation' }}
+    >
+      <div className='w-full flex pb-[6px] gap-4 items-center text-neutral-400'>
+        Earliest Invention
+        <div className='grow'>
+          <div className='w-full h-[1px] bg-neutral-700' />
         </div>
       </div>
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={onDragEnd}
+        onDragStart={({ active }) => setActiveId(active.id)}
+        onDragEnd={event => {
+          setActiveId(null)
+          onDragEnd(event)
+        }}
         modifiers={[restrictToVerticalAxis]}
         disabled={disableDrag}
       >
@@ -37,6 +49,8 @@ export default function GameBoard({
               key={item}
               id={item}
               idx={idx}
+              correctOrder={correctOrder}
+              inventionDates={inventionDates}
               gameOver={gameOver}
               revealInProgress={revealInProgress}
               revealStep={revealStep}
@@ -44,13 +58,26 @@ export default function GameBoard({
             />
           ))}
         </SortableContext>
+
+        <DragOverlay dropAnimation={null}>
+          {activeId ? (
+            <div
+              className='flex items-center justify-between w-full p-3 mb-[10px] rounded-md border border-neutral-400 bg-neutral-900 text-sm text-white cursor-grabbing'
+              style={{ zIndex: 50 }}
+            >
+              <span>{activeId}</span>
+              <span className='text-neutral-400'></span>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
-      <div className="w-full flex pb-3 gap-2 items-center text-neutral-300">
-        <div className="grow">
-          <div className="w-full h-[1px] bg-neutral-600" />
+
+      <div className='w-full flex gap-4 items-center text-neutral-400'>
+        <div className='grow'>
+          <div className='w-full h-[1px] bg-neutral-600' />
         </div>
-        Latest
+        Latest Invention
       </div>
     </main>
-  );
+  )
 }

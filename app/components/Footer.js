@@ -1,7 +1,8 @@
-import { useState } from "react";
-import generateShareCard from "@/utils/generateShareCard";
+import { useState } from 'react'
+import generateShareCard from '@/utils/generateShareCard'
+import Link from 'next/link'
 
-export default function Footer({
+export default function Footer ({
   submittedGuesses,
   gameOver,
   guessesLeft,
@@ -9,60 +10,59 @@ export default function Footer({
   viewMode,
   setViewMode,
   showToggle,
+  lastGuess,
+  correctOrder // ✅ this was likely missing
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
 
-  const handleCopy = () => {
-    const text = generateShareCard(submittedGuesses);
-
-    // Try modern clipboard API first
+  const handleCopy = text => {
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard
         .writeText(text)
         .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
         })
-        .catch(() => fallbackCopy(text));
+        .catch(() => fallbackCopy(text))
     } else {
-      fallbackCopy(text);
+      fallbackCopy(text)
     }
-  };
+  }
 
-  const fallbackCopy = (text) => {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "absolute";
-    textarea.style.left = "-9999px";
-    document.body.appendChild(textarea);
-    textarea.select();
+  const fallbackCopy = text => {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'absolute'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
     try {
-      document.execCommand("copy");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      document.execCommand('copy')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error("Fallback copy failed:", err);
+      console.error('Fallback copy failed:', err)
     }
-    document.body.removeChild(textarea);
-  };
+    document.body.removeChild(textarea)
+  }
 
   return (
-    <footer className="w-full bg-neutral-900 py-4 pb-6">
-      <div className="max-w-md mx-auto flex flex-col gap-2">
+    <footer className='w-full bg-neutral-900 py-4 pb-6'>
+      <div className='max-w-md mx-auto flex flex-col gap-2'>
         {showToggle && (
           <button
-            className="w-full border border-[#505050] rounded-md p-3 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-700"
+            className='w-full border border-[#505050] rounded-md p-3 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700'
             onClick={() =>
-              setViewMode((m) => (m === "guess" ? "correct" : "guess"))
+              setViewMode(m => (m === 'guess' ? 'correct' : 'guess'))
             }
           >
-            {viewMode === "guess" ? (
-              <div className="flex gap-2 justify-center">
+            {viewMode === 'guess' ? (
+              <div className='flex gap-2 justify-center'>
                 View Correct Answers <span>⇆</span>
               </div>
             ) : (
-              <div className="flex gap-2 justify-center">
+              <div className='flex gap-2 justify-center'>
                 View Your Guess<span>⇆</span>
               </div>
             )}
@@ -74,20 +74,22 @@ export default function Footer({
         ) : (
           <button
             onClick={handleSubmit}
-            className="w-full border rounded-md p-3 text-xs text-blue-200 hover:bg-neutral-800"
+            className='w-full border rounded-md p-3 text-sm text-blue-200 hover:bg-neutral-800'
           >
             Submit Answer ({guessesLeft} left)
           </button>
         )}
 
         {gameOver && submittedGuesses.length > 0 && (
-          <div className="flex flex-col items-center gap-2">
-            <pre className="font-mono text-sm whitespace-pre text-center hidden">
-              {generateShareCard(submittedGuesses)}
+          <div className='flex flex-col items-center gap-2'>
+            <pre className='font-mono text-sm whitespace-pre text-center hidden'>
+              {generateShareCard(submittedGuesses, correctOrder)}
             </pre>
             <button
-              onClick={handleCopy}
-              className="border flex justify-center gap-2 rounded-md p-3 w-full text-xs text-purple-300 hover:bg-green-50 dark:hover:bg-neutral-700"
+              onClick={() =>
+                handleCopy(generateShareCard(submittedGuesses, correctOrder))
+              }
+              className='border flex justify-center gap-2 rounded-md p-3 w-full text-sm text-purple-300 hover:bg-green-50 dark:hover:bg-neutral-700'
             >
               {!copied && (
                 <>
@@ -95,12 +97,19 @@ export default function Footer({
                 </>
               )}
               {copied && (
-                <span className="text-purple-300 text-xs">Copied!</span>
+                <span className='text-purple-300 text-sm'>Copied!</span>
               )}
             </button>
           </div>
         )}
+
+        <Link
+          href='/results'
+          className='text-blue-200 text-sm mt-2 p-2 text-center underline'
+        >
+          View Past Results →
+        </Link>
       </div>
     </footer>
-  );
+  )
 }
