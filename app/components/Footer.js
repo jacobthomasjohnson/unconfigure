@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import generateShareCard from '@/utils/generateShareCard'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function Footer ({
   submittedGuesses,
@@ -103,9 +104,31 @@ export default function Footer ({
           </div>
         )}
 
+        <AnimatePresence>
+          {copied && (
+            <motion.div
+              key='toast'
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className='fixed pointer-events-none top-0 left-0 w-full h-full flex items-center justify-center bg-neutral-900 text-[#cffafe] text-lg font-bold'
+            >
+              ✅ Copied to clipboard!
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <Link
+          href='/help'
+          className='text-orange-200 text-sm p-3 text-center underline border rounded-md'
+        >
+          How to play?
+        </Link>
+
         <Link
           href='/results'
-          className='text-blue-200 text-sm mt-2 p-2 text-center underline'
+          className='text-blue-200 text-sm p-3 text-center underline border rounded-md'
         >
           View Past Results →
         </Link>

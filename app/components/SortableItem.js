@@ -11,8 +11,19 @@ export default function SortableItem ({
   gameOver,
   revealInProgress,
   revealStep,
-  showCorrectView
+  showCorrectView,
+  submittedGuesses
 }) {
+  const normalize = s => s.trim().toLowerCase()
+
+  const lastSubmittedGuess = submittedGuesses.at(-1)?.guess || []
+  const isGuessPhase = !gameOver && submittedGuesses.length > 0
+
+  const isLocked =
+    isGuessPhase &&
+    normalize(id) === normalize(correctOrder[idx]) &&
+    normalize(id) === normalize(lastSubmittedGuess[idx])
+
   const {
     attributes,
     listeners,
@@ -20,12 +31,14 @@ export default function SortableItem ({
     transform,
     transition,
     isDragging
-  } = useSortable({ id, disabled: showCorrectView || gameOver })
+  } = useSortable({
+    id,
+    disabled: isLocked || gameOver || showCorrectView
+  })
 
   const isRevealed =
     showCorrectView || (gameOver && (!revealInProgress || revealStep >= idx))
 
-  const normalize = s => s.trim().toLowerCase()
   const status =
     isRevealed && normalize(id) === normalize(correctOrder[idx])
       ? 'correct'
@@ -34,8 +47,8 @@ export default function SortableItem ({
       : 'neutral'
 
   const colorClass = (() => {
-    if (status === 'correct') return 'text-green-500 border-green-500'
-    if (status === 'incorrect') return 'text-red-500 border-red-500'
+    if (status === 'correct') return 'text-[#cffafe] border-[#93c5fd]'
+    if (status === 'incorrect') return 'text-[#fecdd3] border-[#ff8fa3]'
     return 'border-neutral-600'
   })()
 
@@ -43,7 +56,7 @@ export default function SortableItem ({
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 0 : 'auto',
-    opacity: isDragging ? 0 : 1 // ✅ Hides original while dragging
+    opacity: isDragging ? 0 : 1
   }
 
   return (
@@ -60,11 +73,16 @@ export default function SortableItem ({
         transition-colors duration-200
       `}
     >
-      <span className='text-sm font-medium'>{id}</span>
+      <span className='text-sm font-medium'>
+        {id}
+        {isLocked && <span className='text-xs text-green-400 ml-2'>✔</span>}
+      </span>
+
       {isRevealed && inventionDates?.[id] && (
         <span className='text-sm text-neutral-300'>({inventionDates[id]})</span>
       )}
-      {!isRevealed && (
+
+      {!isRevealed && !isLocked && (
         <span
           {...attributes}
           {...listeners}

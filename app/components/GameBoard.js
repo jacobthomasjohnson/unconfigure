@@ -1,8 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { DndContext, closestCenter, DragOverlay } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import {
+  DndContext,
+  closestCenter,
+  DragOverlay
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import SortableItem from './SortableItem'
 
@@ -16,7 +23,8 @@ export default function GameBoard ({
   revealStep,
   showCorrectView,
   correctOrder,
-  inventionDates
+  inventionDates,
+  submittedGuesses // ✅ Now accepted here
 }) {
   const [activeId, setActiveId] = useState(null)
 
@@ -55,6 +63,7 @@ export default function GameBoard ({
               revealInProgress={revealInProgress}
               revealStep={revealStep}
               showCorrectView={showCorrectView}
+              submittedGuesses={submittedGuesses} // ✅ Prop passed to SortableItem
             />
           ))}
         </SortableContext>

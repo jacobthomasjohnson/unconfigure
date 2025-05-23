@@ -8,11 +8,15 @@ import { MAX_GUESSES } from '@/utils/constants'
 import Header from '@/components/Header'
 import GameBoard from '@/components/GameBoard'
 import Footer from '@/components/Footer'
+import { motion } from 'framer-motion'
+import confetti from 'canvas-confetti'
+import useStore from './store/store'
 
 export default function UnorderPage () {
   const today = new Date().toLocaleDateString('en-CA')
   const playKey = `played-${today}`
   const progressKey = `progress-${new Date().toLocaleDateString('en-CA')}`
+  const devMode = useStore(state => state.devMode)
 
   const [items, setItems] = useState([])
   const [correctOrder, setCorrectOrder] = useState([])
@@ -146,27 +150,64 @@ export default function UnorderPage () {
     if (!hud) return
     if (hudTimeoutRef.current) {
       clearTimeout(hudTimeoutRef.current)
-      hud.classList.remove('flashHud')
       void hud.offsetWidth
     }
     hud.innerText = msg
-    hud.classList.add('flashHud')
     hudTimeoutRef.current = setTimeout(() => {
-      hud.classList.remove('flashHud')
       hudTimeoutRef.current = null
     }, 3000)
   }
 
+  const simulateIsCorrect = () => {
+    confetti({
+      particleCount: 120,
+      spread: 80,
+      origin: { y: 1 },
+      startVelocity: 60,
+      gravity: 1,
+      colors: [
+        '#fbcfe8',
+        '#a5f3fc',
+        '#d8b4fe',
+        '#fde68a',
+        '#bbf7d0',
+        '#fecaca',
+        '#e0e7ff',
+        '#fcd5ce'
+      ]
+    })
+  }
+
   const handleSubmit = () => {
     const normalize = s => s.trim().toLowerCase()
+
     const isCorrect = items.every(
       (item, i) => normalize(item) === normalize(correctOrder[i])
     )
 
     const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }]
+
     setSubmittedGuesses(newGuesses)
 
     if (isCorrect) {
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 1 },
+        startVelocity: 60,
+        gravity: 1,
+        colors: [
+          '#fbcfe8',
+          '#a5f3fc',
+          '#d8b4fe',
+          '#fde68a',
+          '#bbf7d0',
+          '#fecaca',
+          '#e0e7ff',
+          '#fcd5ce'
+        ]
+      })
+
       setGameOver(true)
       hudMessage('Correct! Well done.')
       localStorage.setItem(
@@ -201,9 +242,11 @@ export default function UnorderPage () {
       return
     }
 
-    setFlash(true)
     hudMessage('Incorrect! Try again.')
-    setTimeout(() => setFlash(false), 500)
+    setFlash(true)
+    setTimeout(() => {
+      setFlash(false)
+    }, 200)
   }
 
   const revealResult = () => {
@@ -247,33 +290,48 @@ export default function UnorderPage () {
       </div>
 
       {showContent && (
-        <div
-          className={`min-h-full flex flex-col transition-colors ${
-            flash
-              ? 'bg-[rgb(181, 57, 57)]'
-              : 'bg-neutral-50 dark:bg-neutral-900'
-          }`}
-        >
+        <div className={`min-h-full flex flex-col transition-colors`}>
           <div
             id='hud'
             className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]'
           />
           <div className='grow'>
             <Header />
-            <div className='w-full max-w-md mx-auto'>
-              <GameBoard
-                items={boardItems}
-                sensors={sensors}
-                onDragEnd={onDragEnd}
-                disableDrag={gameOver || revealInProgress || showCorrectView}
-                gameOver={gameOver}
-                revealInProgress={revealInProgress}
-                revealStep={revealStep}
-                showCorrectView={showCorrectView}
-                correctOrder={correctOrder}
-                inventionDates={inventionDates}
-              />
-            </div>
+            <motion.div
+              animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
+              transition={{ duration: 0.15 }}
+            >
+              <div className='w-full max-w-md mx-auto'>
+<GameBoard
+  items={boardItems}
+  sensors={sensors}
+  onDragEnd={onDragEnd}
+  disableDrag={gameOver || revealInProgress || showCorrectView}
+  gameOver={gameOver}
+  revealInProgress={revealInProgress}
+  revealStep={revealStep}
+  showCorrectView={showCorrectView}
+  correctOrder={correctOrder}
+  inventionDates={inventionDates}
+  submittedGuesses={submittedGuesses} // ✅ don't forget this
+/>
+
+              </div>
+            </motion.div>
+            {gameOver && (
+              <div className='max-w-md my-4 mx-auto text-center font-light animate-bounce'>
+                {submittedGuesses.at(-1)?.isCorrect
+                  ? '🎉 Good job!'
+                  : '😞 Better luck next time!'}
+              </div>
+            )}
+
+            <button
+              className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`}
+              onClick={() => simulateIsCorrect()}
+            >
+              Simulate Correct Response
+            </button>
           </div>
           <Footer
             submittedGuesses={submittedGuesses}
