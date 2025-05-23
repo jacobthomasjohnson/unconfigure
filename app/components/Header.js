@@ -40,7 +40,7 @@ export default function Header () {
           backgroundImage: `linear-gradient(to bottom, #161616 0%, #161616 70%, rgba(16,16,16,0) 100%)`
         }}
       >
-        <h1 className='text-3xl tracking-tight font-black flex items-end border-b pb-4 border-neutral-600 justify-between w-full'>
+        <h1 className='text-3xl tracking-tight font-black flex items-end justify-between w-full'>
           UNCONFIGURE
           <span className='text-neutral-500 font-medium text-sm ml-2'>{today}</span>
         </h1>

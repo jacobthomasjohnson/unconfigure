@@ -11,6 +11,7 @@ import Footer from '@/components/Footer'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import useStore from './store/store'
+import { slotLockingStrategy } from '@/utils/slotLockingStrategy'
 
 export default function UnorderPage () {
   const today = new Date().toLocaleDateString('en-CA')
@@ -127,15 +128,37 @@ export default function UnorderPage () {
       activationConstraint: { delay: 0, tolerance: 0 }
     })
   )
-
   const onDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return
-    const oldIdx = items.indexOf(active.id)
-    const newIdx = items.indexOf(over.id)
-    const newItems = arrayMove(items, oldIdx, newIdx)
+
+    const oldIndex = items.indexOf(active.id)
+    const newIndex = items.indexOf(over.id)
+
+    // Determine locked indexes based on the last submitted guess
+    const lastGuess = submittedGuesses.at(-1)?.guess || []
+    const lockedIndexes = correctOrder.reduce((acc, id, idx) => {
+      if (
+        lastGuess[idx] &&
+        lastGuess[idx].trim().toLowerCase() === id.trim().toLowerCase()
+      ) {
+        acc.push(idx)
+      }
+      return acc
+    }, [])
+
+    const newItems = slotLockingStrategy(
+      items,
+      active.id,
+      over.id,
+      lockedIndexes
+    )
+
+    // If the items haven't changed, do nothing
+    if (newItems === items) return
+
     setItems(newItems)
 
-    // Save dragged state
+    // Save the new state
     localStorage.setItem(
       progressKey,
       JSON.stringify({
@@ -274,7 +297,7 @@ export default function UnorderPage () {
     setViewMode('guess')
   }
 
-  const lastGuess = submittedGuesses.at(-1)?.guess
+  const lastGuess = submittedGuesses.at(-1)?.guess || []
   const guessesLeft = MAX_GUESSES - submittedGuesses.length
   const showCorrectView = viewMode === 'correct'
   const boardItems = showCorrectView ? correctOrder : items
@@ -302,20 +325,20 @@ export default function UnorderPage () {
               transition={{ duration: 0.15 }}
             >
               <div className='w-full max-w-md mx-auto'>
-<GameBoard
-  items={boardItems}
-  sensors={sensors}
-  onDragEnd={onDragEnd}
-  disableDrag={gameOver || revealInProgress || showCorrectView}
-  gameOver={gameOver}
-  revealInProgress={revealInProgress}
-  revealStep={revealStep}
-  showCorrectView={showCorrectView}
-  correctOrder={correctOrder}
-  inventionDates={inventionDates}
-  submittedGuesses={submittedGuesses} // ✅ don't forget this
-/>
-
+                {console.log('items:', items)}
+                <GameBoard
+                  items={boardItems}
+                  sensors={sensors}
+                  onDragEnd={onDragEnd}
+                  disableDrag={gameOver || revealInProgress || showCorrectView}
+                  gameOver={gameOver}
+                  revealInProgress={revealInProgress}
+                  revealStep={revealStep}
+                  showCorrectView={showCorrectView}
+                  correctOrder={correctOrder}
+                  inventionDates={inventionDates}
+                  submittedGuesses={submittedGuesses} // ✅ don't forget this
+                />
               </div>
             </motion.div>
             {gameOver && (

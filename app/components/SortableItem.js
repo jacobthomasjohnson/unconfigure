@@ -12,17 +12,12 @@ export default function SortableItem ({
   revealInProgress,
   revealStep,
   showCorrectView,
-  submittedGuesses
+  submittedGuesses,
+  isLocked // ✅ this is passed from GameBoard
 }) {
-  const normalize = s => s.trim().toLowerCase()
+  const normalize = s => (s ? s.trim().toLowerCase() : '')
 
-  const lastSubmittedGuess = submittedGuesses.at(-1)?.guess || []
-  const isGuessPhase = !gameOver && submittedGuesses.length > 0
-
-  const isLocked =
-    isGuessPhase &&
-    normalize(id) === normalize(correctOrder[idx]) &&
-    normalize(id) === normalize(lastSubmittedGuess[idx])
+  const lastSubmittedGuess = submittedGuesses?.at(-1)?.guess || []
 
   const {
     attributes,
@@ -40,7 +35,7 @@ export default function SortableItem ({
     showCorrectView || (gameOver && (!revealInProgress || revealStep >= idx))
 
   const status =
-    isRevealed && normalize(id) === normalize(correctOrder[idx])
+    isRevealed && normalize(id) === normalize(correctOrder?.[idx])
       ? 'correct'
       : isRevealed
       ? 'incorrect'
