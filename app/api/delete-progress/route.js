@@ -9,7 +9,7 @@ const supabase = createClient(
 
 export async function POST (req) {
   const body = await req.json()
-  const { user_id } = body
+  const { user_id, date } = body
 
   if (!user_id) {
     return new Response(JSON.stringify({ error: 'Missing user_id' }), {
@@ -18,10 +18,13 @@ export async function POST (req) {
     })
   }
 
-  const { error } = await supabase
-    .from('game_progress')
-    .delete()
-    .eq('user_id', user_id)
+  let query = supabase.from('game_progress').delete().eq('user_id', user_id)
+
+  if (date) {
+    query = query.eq('date', date) // delete specific entry if date provided
+  }
+
+  const { error } = await query
 
   if (error) {
     console.error('[Supabase] Delete error:', error)

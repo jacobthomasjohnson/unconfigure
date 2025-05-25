@@ -81,7 +81,7 @@ export default function Footer ({
         ) : (
           <button
             onClick={handleSubmit}
-            className='w-full border rounded-md p-3 text-sm text-blue-200 hover:bg-neutral-800'
+            className='w-full border rounded-md p-4 text-sm text-blue-200 hover:bg-neutral-800'
           >
             Submit Answer ({guessesLeft} left)
           </button>
@@ -96,7 +96,7 @@ export default function Footer ({
               onClick={() =>
                 handleCopy(generateShareCard(submittedGuesses, correctOrder))
               }
-              className='border flex justify-center gap-2 rounded-md p-3 w-full text-sm text-purple-300 hover:cursor-pointer'
+              className='border flex justify-center gap-2 rounded-md p-4 w-full text-sm text-purple-300 hover:cursor-pointer'
             >
               {!copied && (
                 <>
@@ -113,14 +113,14 @@ export default function Footer ({
         <div className='flex justify-between gap-2'>
           <Link
             href='/help'
-            className='text-orange-200 text-sm p-3 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
+            className='text-orange-200 text-sm p-4 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
           >
             How to play? <LucideShieldQuestion width={16} height={16} />
           </Link>
 
           <Link
             href='/results'
-            className='text-blue-200 text-sm p-3 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
+            className='text-blue-200 text-sm p-4 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
           >
             View Past Results <History width={16} height={16} />
           </Link>

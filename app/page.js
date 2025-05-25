@@ -325,7 +325,6 @@ export default function UnorderPage () {
             className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]'
           />
           <div className='grow'>
-            <Header />
             <motion.div
               animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
               transition={{ duration: 0.15 }}

@@ -60,10 +60,7 @@ export default function GameBoard ({
         disabled={disableDrag}
       >
         {/* Only the unlocked items go into the SortableContext */}
-        <SortableContext
-          items={unlockedItems}
-          strategy={verticalListSortingStrategy}
-        >
+        <SortableContext items={unlockedItems} strategy={verticalListSortingStrategy}>
           {items.map((item, idx) => (
             <SortableItem
               key={item}

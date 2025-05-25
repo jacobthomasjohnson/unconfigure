@@ -3,13 +3,21 @@
 import { useEffect, useState } from 'react'
 import Header from '@/components/Header'
 import Link from 'next/link'
-import { ArrowLeft, LucideDelete, Calendar, Copy, ReplyAll } from 'lucide-react'
+import {
+  ArrowLeft,
+  LucideDelete,
+  Calendar,
+  Copy,
+  ReplyAll,
+  Delete
+} from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabaseClient'
 import { getOrCreateAnonId } from '@/utils/userId'
 
 export default function ResultsPage () {
   const [entries, setEntries] = useState([])
   const [showConfirmClear, setShowConfirmClear] = useState(false)
+  const [confirmingDeleteDate, setConfirmingDeleteDate] = useState(null)
 
   const copyToClipboard = async text => {
     try {
@@ -86,14 +94,33 @@ export default function ResultsPage () {
     setShowConfirmClear(false)
   }
 
+  const handleDeleteResult = async date => {
+    const anonId = getOrCreateAnonId()
+
+    const res = await fetch('/api/delete-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: anonId, date })
+    })
+
+    const result = await res.json()
+
+    if (!res.ok) {
+      console.error('Failed to delete entry: ', result)
+      return
+    }
+
+    setEntries(prev => prev.filter(e => e.date !== date))
+    setConfirmingDeleteDate(null) // ✅ reset after successful delete
+  }
+
   return (
-    <div className='max-w-md mx-auto h-full flex flex-col'>
-      <Header />
-      <h1 className='text-lg font-normal mb-2 text-neutral-200'>
-        Your Play History
+    <div className='w-full max-w-md mx-auto h-full flex flex-col'>
+      <h1 className='text-lg mb-2 text-neutral-200 font-bold'>
+        PLAY HISTORY
       </h1>
       {entries.length === 0 ? (
-        <p className='text-neutral-300'>No results yet. Play a game first!</p>
+        <p className='text-neutral-400'>No results yet. Play a game first!</p>
       ) : (
         entries.map(entry => (
           <div
@@ -123,6 +150,24 @@ export default function ResultsPage () {
             <div className='flex flex-col gap-2 justify-center'>
               <button
                 onClick={() =>
+                  confirmingDeleteDate === entry.date
+                    ? handleDeleteResult(entry.date)
+                    : setConfirmingDeleteDate(entry.date)
+                }
+                className={`text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition hover:cursor-pointer flex gap-2 items-center justify-start ${
+                  confirmingDeleteDate === entry.date
+                    ? 'border-red-400 text-red-300'
+                    : ''
+                }`}
+              >
+                <Delete width={14} height={14} />
+                {confirmingDeleteDate === entry.date
+                  ? 'Delete?'
+                  : 'Delete'}
+              </button>
+
+              <button
+                onClick={() =>
                   copyToClipboard(`${window.location.origin}/${entry.date}`)
                 }
                 className='text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition hover:cursor-pointer flex gap-2 items-center justify-start'
@@ -145,11 +190,11 @@ export default function ResultsPage () {
 
       <div className='grow'></div>
 
-      <div className='w-full flex flex-col gap-[6px] mb-6'>
+      <div className='w-full flex flex-col gap-[6px] my-6'>
         {showConfirmClear && (
-          <div className='flex flex-col gap-2 p-4 border border-red-400 rounded bg-neutral-900 mb-2'>
-            <p className='text-red-300 text-base text-center font-bold'>
-              Are you sure you want to clear all results?
+          <div className='flex fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md flex-col gap-4 p-4 border-y border-red-300 rounded bg-neutral-900 mb-2'>
+            <p className='text-red-300 text-xl text-center font-bold'>
+              Are you sure you want to clear all of your personal results?
             </p>
             <div className='flex gap-2 justify-center'>
               <button
@@ -160,9 +205,9 @@ export default function ResultsPage () {
               </button>
               <button
                 onClick={() => setShowConfirmClear(false)}
-                className='text-sm px-3 py-3 border border-green-200 text-green-200 rounded hover:bg-neutral-800'
+                className='text-sm px-3 py-3 border border-blue-200 text-blue-200 rounded hover:bg-neutral-800'
               >
-                Nevermind! Don't clear history
+                Nevermind! I want to keep my play history.
               </button>
             </div>
           </div>
