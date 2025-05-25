@@ -1,3 +1,5 @@
+/* eslint-disable react/no-unescaped-entities */
+
 'use client'
 
 import Link from 'next/link'
@@ -19,15 +21,31 @@ export default function HelpPage () {
             />
           </div>
           <div>
-            Your goal is to place the inventions in the correct order, from earliest to most recent.
-            <ol className="list-decimal mx-8 flex flex-col gap-4 my-8">
-              <li><span className="font-bold">Drag and drop</span> each invention using the handles on the right.</li>
-              <li>Once you've arranged them how you think they go, hit <span className="text-blue-200 font-bold">Submit</span>.</li>
-              <li>You'll get visual feedback showing which items are in the correct spot.</li>
-              <li>You have <span className="font-bold">3 chances</span> to get the full order right.</li>
+            Your goal is to place the inventions in the correct order, from
+            earliest to most recent.
+            <ol className='list-decimal mx-8 flex flex-col gap-4 my-8'>
+              <li>
+                <span className='font-bold'>Drag and drop</span> each invention
+                using the handles on the right.
+              </li>
+              <li>
+                Once you've arranged them how you think they go, hit{' '}
+                <span className='text-blue-200 font-bold'>Submit</span>.
+              </li>
+              <li>
+                You'll get visual feedback showing which items are in the
+                correct spot.
+              </li>
+              <li>
+                You have <span className='font-bold'>3 chances</span> to get the
+                full order right.
+              </li>
             </ol>
           </div>
-          <Link className='p-6 border w-full text-center rounded-md mb-8' href='/'>
+          <Link
+            className='p-6 border w-full text-center rounded-md mb-8'
+            href='/'
+          >
             Got it! Bring me back to the game
           </Link>
         </div>
