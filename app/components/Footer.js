@@ -2,6 +2,7 @@ import { useState } from 'react'
 import generateShareCard from '@/utils/generateShareCard'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
+import { LucideShieldQuestion, History } from 'lucide-react'
 
 export default function Footer ({
   submittedGuesses,
@@ -53,20 +54,25 @@ export default function Footer ({
       <div className='max-w-md mx-auto flex flex-col gap-2'>
         {showToggle && (
           <button
-            className='w-full border border-[#505050] rounded-md p-3 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-700'
-            onClick={() =>
-              setViewMode(m => (m === 'guess' ? 'correct' : 'guess'))
-            }
+            className={`w-full flex gap-2 items-center justify-center border-[#505050] rounded-md p-2 text-sm ${
+              viewMode === 'guess' ? 'opacity-80' : 'opacity-100'
+            }`}
           >
-            {viewMode === 'guess' ? (
-              <div className='flex gap-2 justify-center'>
-                View Correct Answers <span>⇆</span>
-              </div>
-            ) : (
-              <div className='flex gap-2 justify-center'>
-                View Your Guess<span>⇆</span>
-              </div>
-            )}
+            Reveal Answers
+            <div
+              className={`border border-[#dadada] inline-block min-h-[25px] min-w-[50px] rounded-full relative overflow-hidden hover:cursor-pointer ${
+                viewMode === 'guess' ? 'opacity-60' : 'opacity-100'
+              }`}
+              onClick={() =>
+                setViewMode(m => (m === 'guess' ? 'correct' : 'guess'))
+              }
+            >
+              <div
+                className={`absolute transition-transform ease-in-out scale-[1.01] duration-300 -translate-y-[1px] top-0 left-0 h-[25px] w-[25px] bg-[#dadada] rounded-full ${
+                  viewMode === 'guess' ? '' : 'translate-x-full'
+                }`}
+              />
+            </div>
           </button>
         )}
 
@@ -90,7 +96,7 @@ export default function Footer ({
               onClick={() =>
                 handleCopy(generateShareCard(submittedGuesses, correctOrder))
               }
-              className='border flex justify-center gap-2 rounded-md p-3 w-full text-sm text-purple-300 hover:bg-green-50 dark:hover:bg-neutral-700'
+              className='border flex justify-center gap-2 rounded-md p-3 w-full text-sm text-purple-300 hover:cursor-pointer'
             >
               {!copied && (
                 <>
@@ -98,40 +104,27 @@ export default function Footer ({
                 </>
               )}
               {copied && (
-                <span className='text-purple-300 text-sm'>Copied!</span>
+                <span className='text-purple-200 text-sm'>Copied!</span>
               )}
             </button>
           </div>
         )}
 
-        <AnimatePresence>
-          {copied && (
-            <motion.div
-              key='toast'
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className='fixed pointer-events-none top-0 left-0 w-full h-full flex items-center justify-center bg-neutral-900 text-[#cffafe] text-lg font-bold'
-            >
-              ✅ Copied to clipboard!
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className='flex justify-between gap-2'>
+          <Link
+            href='/help'
+            className='text-orange-200 text-sm p-3 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
+          >
+            How to play? <LucideShieldQuestion width={16} height={16} />
+          </Link>
 
-        <Link
-          href='/help'
-          className='text-orange-200 text-sm p-3 text-center underline border rounded-md'
-        >
-          How to play?
-        </Link>
-
-        <Link
-          href='/results'
-          className='text-blue-200 text-sm p-3 text-center underline border rounded-md'
-        >
-          View Past Results →
-        </Link>
+          <Link
+            href='/results'
+            className='text-blue-200 text-sm p-3 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
+          >
+            View Past Results <History width={16} height={16} />
+          </Link>
+        </div>
       </div>
     </footer>
   )

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
 import { shuffle } from '@/utils/utils'
 import { MAX_GUESSES } from '@/utils/constants'
 import Header from '@/components/Header'
@@ -12,11 +12,16 @@ import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import useStore from './store/store'
 import { slotLockingStrategy } from '@/utils/slotLockingStrategy'
+import { createSupabaseClient } from '@/lib/supabaseClient'
+import { getOrCreateAnonId } from '@/utils/userId'
 
 export default function UnorderPage () {
-  const today = new Date().toLocaleDateString('en-CA')
-  const playKey = `played-${today}`
-  const progressKey = `progress-${new Date().toLocaleDateString('en-CA')}`
+  const searchParams = useSearchParams()
+  const dateParam = searchParams.get('date')
+  const replay = searchParams.get('replay') === 'true'
+
+  const today = dateParam || new Date().toLocaleDateString('en-CA')
+  const progressKey = `progress-${today}`
   const devMode = useStore(state => state.devMode)
 
   const [items, setItems] = useState([])
@@ -29,59 +34,50 @@ export default function UnorderPage () {
   const [flash, setFlash] = useState(false)
   const [viewMode, setViewMode] = useState('guess')
   const [loading, setLoading] = useState(true)
-  const hudTimeoutRef = useRef(null)
   const [showContent, setShowContent] = useState(false)
   const [loadingScreenVisible, setLoadingScreenVisible] = useState(true)
 
+  const hudTimeoutRef = useRef(null)
+
+  // Loading animation screen
   useEffect(() => {
     if (!loading) {
-      const hasSeenLoading = sessionStorage.getItem('seenLoadingScreen')
-      if (hasSeenLoading) {
+      const seen = sessionStorage.getItem('seenLoadingScreen')
+      if (seen) {
         setShowContent(true)
         setLoadingScreenVisible(false)
       } else {
         sessionStorage.setItem('seenLoadingScreen', 'true')
-        const timeout = setTimeout(() => {
+        setTimeout(() => {
           setShowContent(true)
           setLoadingScreenVisible(false)
         }, 700)
-        return () => clearTimeout(timeout)
       }
     }
   }, [loading])
 
+  // Main game data load
   useEffect(() => {
-    const played = localStorage.getItem(playKey)
-    if (played) {
-      try {
-        const parsed = JSON.parse(played)
-        setCorrectOrder(parsed.correctOrder || [])
-        setInventionDates(parsed.inventionDates || {})
-        setSubmittedGuesses(parsed.guesses || [])
-        setItems(parsed.guesses.at(-1)?.guess || [])
-        setGameOver(true)
-        setViewMode('guess')
+    const fetchGameData = async () => {
+      // Always instantiate client *inside* effect/handler
+      const userId = getOrCreateAnonId()
+      const supabase = createSupabaseClient(userId)
+
+      const { data, error } = await supabase
+        .from('daily_games')
+        .select('*')
+        .eq('date', today)
+
+      if (error) {
+        console.error('Error fetching daily game:', error)
         setLoading(false)
         return
-      } catch (e) {
-        console.error('Failed to load played state', e)
       }
-    }
 
-    const fetchGameData = async () => {
-      const res = await fetch(
-        `https://heagetejgsosyqukwzcg.supabase.co/rest/v1/daily_games?date=eq.${today}`,
-        {
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-          }
-        }
-      )
-      const data = await res.json()
-      const game = data[0]
+      const game = data?.[0]
       if (!game) {
         console.error('No game found for today')
+        setLoading(false)
         return
       }
 
@@ -92,35 +88,66 @@ export default function UnorderPage () {
       setCorrectOrder(game.inventions)
       setInventionDates(cleanedDates)
 
-      const progress = localStorage.getItem(progressKey)
-      if (progress) {
+      // Now handle user progress from Supabase (never top-level)
+
+      if (!replay) {
         try {
-          const parsed = JSON.parse(progress)
-          setItems(parsed.items || shuffle(game.inventions))
-          setSubmittedGuesses(parsed.guesses || [])
-          setViewMode('guess')
-        } catch (e) {
-          console.error('Failed to parse progress state', e)
-          setItems(shuffle(game.inventions))
+          const response = await fetch(
+            `/api/get-progress?user_id=${userId}&date=${today}`
+          )
+          const result = await response.json()
+
+          if (response.ok && result.data?.guesses?.length > 0) {
+            const savedGame = result.data
+            setSubmittedGuesses(savedGame.guesses)
+            setItems(
+              savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
+            )
+            setCorrectOrder(savedGame.correct_order || [])
+            setInventionDates(savedGame.invention_dates || {})
+            setGameOver(true)
+            setViewMode('guess')
+            setLoading(false)
+            return
+          }
+        } catch (err) {
+          console.warn('Failed to fetch saved progress:', err)
         }
+      }
+
+      const progress = localStorage.getItem(progressKey)
+      if (progress && !replay) {
+        const parsed = JSON.parse(progress)
+        const validItems =
+          Array.isArray(parsed.items) && parsed.items.length > 0
+            ? parsed.items
+            : shuffle(game.inventions)
+
+        const validGuesses = Array.isArray(parsed.guesses) ? parsed.guesses : []
+
+        setItems(validItems)
+        setSubmittedGuesses(validGuesses)
       } else {
         setItems(shuffle(game.inventions))
+        setSubmittedGuesses([])
       }
 
       setLoading(false)
     }
 
     fetchGameData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Persist progress locally (not server) during play
   useEffect(() => {
     if (!gameOver && correctOrder.length > 0) {
-      const state = {
-        items,
-        guesses: submittedGuesses
-      }
-      localStorage.setItem(progressKey, JSON.stringify(state))
+      localStorage.setItem(
+        progressKey,
+        JSON.stringify({ items, guesses: submittedGuesses })
+      )
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, submittedGuesses, gameOver, correctOrder])
 
   const sensors = useSensors(
@@ -128,21 +155,17 @@ export default function UnorderPage () {
       activationConstraint: { delay: 0, tolerance: 0 }
     })
   )
+
   const onDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return
 
     const oldIndex = items.indexOf(active.id)
     const newIndex = items.indexOf(over.id)
-
-    // Determine locked indexes based on the last submitted guess
     const lastGuess = submittedGuesses.at(-1)?.guess || []
+
     const lockedIndexes = correctOrder.reduce((acc, id, idx) => {
-      if (
-        lastGuess[idx] &&
-        lastGuess[idx].trim().toLowerCase() === id.trim().toLowerCase()
-      ) {
+      if (lastGuess[idx]?.trim().toLowerCase() === id.trim().toLowerCase())
         acc.push(idx)
-      }
       return acc
     }, [])
 
@@ -152,36 +175,26 @@ export default function UnorderPage () {
       over.id,
       lockedIndexes
     )
-
-    // If the items haven't changed, do nothing
     if (newItems === items) return
-
     setItems(newItems)
 
-    // Save the new state
     localStorage.setItem(
       progressKey,
-      JSON.stringify({
-        items: newItems,
-        guesses: submittedGuesses
-      })
+      JSON.stringify({ items: newItems, guesses: submittedGuesses })
     )
   }
 
   const hudMessage = msg => {
     const hud = document.getElementById('hud')
     if (!hud) return
-    if (hudTimeoutRef.current) {
-      clearTimeout(hudTimeoutRef.current)
-      void hud.offsetWidth
-    }
+    if (hudTimeoutRef.current) clearTimeout(hudTimeoutRef.current)
     hud.innerText = msg
     hudTimeoutRef.current = setTimeout(() => {
       hudTimeoutRef.current = null
     }, 3000)
   }
 
-  const simulateIsCorrect = () => {
+  const triggerConfetti = () => {
     confetti({
       particleCount: 120,
       spread: 80,
@@ -201,88 +214,81 @@ export default function UnorderPage () {
     })
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const normalize = s => s.trim().toLowerCase()
-
     const isCorrect = items.every(
       (item, i) => normalize(item) === normalize(correctOrder[i])
     )
-
     const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }]
-
     setSubmittedGuesses(newGuesses)
 
-    if (isCorrect) {
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 1 },
-        startVelocity: 60,
-        gravity: 1,
-        colors: [
-          '#fbcfe8',
-          '#a5f3fc',
-          '#d8b4fe',
-          '#fde68a',
-          '#bbf7d0',
-          '#fecaca',
-          '#e0e7ff',
-          '#fcd5ce'
-        ]
-      })
+    const userId = getOrCreateAnonId()
+    const supabase = createSupabaseClient(userId)
 
+    const result = isCorrect
+      ? 'win'
+      : newGuesses.length >= MAX_GUESSES
+      ? 'lose'
+      : 'in_progress'
+
+    if (isCorrect) {
+      triggerConfetti()
       setGameOver(true)
       hudMessage('Correct! Well done.')
-      localStorage.setItem(
-        playKey,
-        JSON.stringify({
-          date: today,
-          guesses: newGuesses,
-          correctOrder,
-          inventionDates,
-          result: 'win'
-        })
-      )
-      localStorage.removeItem(progressKey)
-      return
     }
 
-    if (newGuesses.length >= MAX_GUESSES) {
+    if (result === 'lose') {
       setGameOver(true)
       hudMessage('Incorrect. Better luck next time!')
       revealResult()
-      localStorage.setItem(
-        playKey,
-        JSON.stringify({
-          date: today,
-          guesses: newGuesses,
-          correctOrder,
-          inventionDates,
-          result: 'lose'
+    }
+
+    // Only save to server if game is over
+    if (result !== 'in_progress') {
+      const payload = {
+        user_id: userId,
+        date: today,
+        guesses: newGuesses,
+        correct_order: correctOrder,
+        invention_dates: inventionDates,
+        result
+      }
+
+      try {
+        const response = await fetch('/api/save-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         })
-      )
+
+        const data = await response.json()
+
+        if (!response.ok || data.error) {
+          console.error('❌ Failed to save result to server:', data.error)
+          hudMessage('❌ Failed to save result to server.')
+        } else {
+          console.log('✅ Game progress saved via API')
+        }
+      } catch (err) {
+        console.error('❌ Network error while saving progress:', err)
+        hudMessage('❌ Could not connect to server.')
+      }
+
       localStorage.removeItem(progressKey)
       return
     }
 
     hudMessage('Incorrect! Try again.')
     setFlash(true)
-    setTimeout(() => {
-      setFlash(false)
-    }, 200)
+    setTimeout(() => setFlash(false), 200)
   }
 
   const revealResult = () => {
     setRevealInProgress(true)
-    setRevealStep(-1)
     let step = 0
     const loop = () => {
-      if (step >= items.length) {
-        setRevealInProgress(false)
-        return
-      }
-      setRevealStep(step)
-      step++
+      if (step >= items.length) return setRevealInProgress(false)
+      setRevealStep(step++)
       setTimeout(loop, 250)
     }
     loop()
@@ -313,7 +319,7 @@ export default function UnorderPage () {
       </div>
 
       {showContent && (
-        <div className={`min-h-full flex flex-col transition-colors`}>
+        <div className='min-h-full flex flex-col transition-colors'>
           <div
             id='hud'
             className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]'
@@ -325,7 +331,6 @@ export default function UnorderPage () {
               transition={{ duration: 0.15 }}
             >
               <div className='w-full max-w-md mx-auto'>
-                {console.log('items:', items)}
                 <GameBoard
                   items={boardItems}
                   sensors={sensors}
@@ -337,21 +342,20 @@ export default function UnorderPage () {
                   showCorrectView={showCorrectView}
                   correctOrder={correctOrder}
                   inventionDates={inventionDates}
-                  submittedGuesses={submittedGuesses} // ✅ don't forget this
+                  submittedGuesses={submittedGuesses}
                 />
               </div>
             </motion.div>
             {gameOver && (
-              <div className='max-w-md my-4 mx-auto text-center font-light animate-bounce'>
+              <div className='max-w-md mt-2 mx-auto text-center font-light animate-bounce'>
                 {submittedGuesses.at(-1)?.isCorrect
-                  ? '🎉 Good job!'
+                  ? '🎉 Nicely done!'
                   : '😞 Better luck next time!'}
               </div>
             )}
-
             <button
               className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`}
-              onClick={() => simulateIsCorrect()}
+              onClick={triggerConfetti}
             >
               Simulate Correct Response
             </button>

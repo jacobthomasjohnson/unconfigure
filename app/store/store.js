@@ -8,7 +8,7 @@ const useStore = create((set) => ({
       gameOver: false,
       revealInProgress: false,
       revealStep: -1,
-      devMode: true,
+      devMode: false,
       flash: false,
       viewMode: "guess",
       hudMessage: "",

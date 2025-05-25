@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Grip } from 'lucide-react'
+import { Grip, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function SortableItem ({
@@ -68,10 +68,12 @@ export default function SortableItem ({
         transition-colors duration-200
       `}
     >
-      <span className='text-sm font-medium'>
-        {id}
-        {isLocked && <span className='text-xs text-green-400 ml-2'>✔</span>}
-      </span>
+      {id}
+      {isLocked && (
+        <span className='text-xs text-green-400 ml-2'>
+          <Check width={14} height={14} />
+        </span>
+      )}
 
       {isRevealed && inventionDates?.[id] && (
         <span className='text-sm text-neutral-300'>({inventionDates[id]})</span>

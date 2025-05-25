@@ -35,14 +35,16 @@ export default function Header () {
     <>
       <header
         ref={headerRef}
-        className='fixed top-0 left-1/2 -translate-x-1/2 flex flex-col justify-center items-start w-full max-w-md mx-auto py-4 px-4 md:px-0'
+        className='fixed px-4 z-[1000] top-0 left-1/2 -translate-x-1/2 flex flex-col justify-center items-start w-full max-w-md mx-auto py-4'
         style={{
           backgroundImage: `linear-gradient(to bottom, #161616 0%, #161616 70%, rgba(16,16,16,0) 100%)`
         }}
       >
         <h1 className='text-3xl tracking-tight font-black flex items-end justify-between w-full'>
           UNCONFIGURE
-          <span className='text-neutral-500 font-medium text-sm ml-2'>{today}</span>
+          <span className='text-neutral-500 font-medium text-sm ml-2'>
+            {today}
+          </span>
         </h1>
       </header>
       <div style={{ height: headerHeight + 'px' }} />
