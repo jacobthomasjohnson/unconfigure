@@ -213,7 +213,7 @@ export default function ResultsPage() {
 
                 <button
                   onClick={() => {
-                    const resultString = `Unconfigure.com results from ${entry.date}\n` + entry.guesses.map(({ guess }, idx) => {
+                    const resultString = `My https://unconfigure.com/ results from ${entry.date}\n` + entry.guesses.map(({ guess }, idx) => {
                       const emojiRow = guess
                         .map((val, i) =>
                           val.trim().toLowerCase() === entry.correct_order[i].trim().toLowerCase()

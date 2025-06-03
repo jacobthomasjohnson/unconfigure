@@ -3,7 +3,7 @@ import { MAX_GUESSES } from './constants'
 export default function generateShareCard (allGuesses, correctOrder) {
   const normalize = str => str.trim().toLowerCase()
 
-  const header = `My Unconfigure Results from Today!`
+  const header = `My https://unconfigure.com/ Results from Today!`
 
   const lines = allGuesses.map(({ guess }, idx) => {
     const emojis = guess
