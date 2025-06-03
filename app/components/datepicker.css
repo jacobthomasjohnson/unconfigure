@@ -1,0 +1,32 @@
+.rdp {
+  --rdp-accent-color: #2563eb;
+  --rdp-background-color: #161616;
+  --rdp-outline: 2px solid #2563eb;
+  --rdp-selected-color: #ffffff;
+  --rdp-selected-bg: #2563eb;
+  --rdp-hover-bg: #333333;
+  --rdp-disabled-color: #555555;
+  color: #e5e5e5;
+  background-color: #161616;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.rdp-caption {
+  color: #e5e5e5;
+}
+
+.rdp-day_selected {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.rdp-day_today {
+  border: 1px solid #444;
+}
+
+.rdp-day_disabled {
+  color: #555 !important;
+  background-color: transparent !important;
+  pointer-events: none;
+}

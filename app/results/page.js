@@ -6,9 +6,11 @@ import {
   ArrowLeft, LucideDelete, Calendar, Copy, ReplyAll, Delete
 } from 'lucide-react'
 
+import Header from '@/components/Header'
 import { supabase } from '@/lib/supabaseClient'
 import { getOrCreateAnonId } from '@/utils/userId'
 import { useRouter } from 'next/navigation'
+import DateSelector from '@/components/DateSelector'
 
 export default function ResultsPage() {
   const [entries, setEntries] = useState([])
@@ -137,18 +139,23 @@ export default function ResultsPage() {
 
   return (
     <div className='w-full max-w-md mx-auto h-full flex flex-col'>
+      <Header />
       <h1 className='text-xl text-center mb-2 mt-4 text-neutral-200 font-bold'>PLAY ANY DATE</h1>
-
       <div className='border border-neutral-700 p-4 rounded mb-8'>
         <div className='flex gap-2 items-center'>
-          <input
-            type='date'
-            className='p-2 rounded grow bg-neutral-800 text-neutral-100 border border-neutral-600'
-            value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)}
-            min="2025-05-21"
-            max={new Date().toISOString().split('T')[0]}
-          />
+          <div className='relative grow'>
+            <div className='relative grow'>
+              <DateSelector
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                minDate="2025-05-21"
+                maxDate={new Date().toISOString().split('T')[0]}
+              />
+
+            </div>
+
+          </div>
+
           <button
             onClick={handlePlayDate}
             disabled={isLoading}
@@ -158,9 +165,7 @@ export default function ResultsPage() {
           </button>
         </div>
       </div>
-
       <h1 className='text-xl text-center mb-2 text-neutral-200 font-bold'>PLAY HISTORY</h1>
-
       {entries.length === 0 ? (
         <p className='text-neutral-400'>No results yet. Play a game first!</p>
       ) : (
@@ -239,9 +244,7 @@ export default function ResultsPage() {
           )
         })
       )}
-
       <div className='grow'></div>
-
       <div className='w-full flex flex-col gap-2 my-6'>
         {showConfirmClear && (
           <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md flex-col gap-4 p-4 border-y border-red-300 rounded bg-neutral-900 mb-2'>
@@ -264,7 +267,6 @@ export default function ResultsPage() {
             </div>
           </div>
         )}
-
         <button
           onClick={() => setShowConfirmClear(true)}
           className='flex items-center gap-1 justify-center text-sm text-red-400 border border-red-400 p-4 rounded hover:text-red-300 hover:border-red-300 transition'
@@ -272,7 +274,6 @@ export default function ResultsPage() {
           <LucideDelete width={14} height={14} />
           Clear Historical Results
         </button>
-
         <Link href='/'>
           <button className='flex items-center justify-center gap-1 w-full text-sm text-neutral-300 border border-neutral-300 p-4 rounded hover:text-neutral-100 hover:border-neutral-100 transition'>
             <ArrowLeft width={14} height={14} />
