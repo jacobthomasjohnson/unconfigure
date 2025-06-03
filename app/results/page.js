@@ -1,30 +1,28 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Header from '@/components/Header'
 import Link from 'next/link'
 import {
-  ArrowLeft,
-  LucideDelete,
-  Calendar,
-  Copy,
-  ReplyAll,
-  Delete
+  ArrowLeft, LucideDelete, Calendar, Copy, ReplyAll, Delete
 } from 'lucide-react'
-import { createSupabaseClient } from '@/lib/supabaseClient'
-import { getOrCreateAnonId } from '@/utils/userId'
 
-export default function ResultsPage () {
+import { supabase } from '@/lib/supabaseClient'
+import { getOrCreateAnonId } from '@/utils/userId'
+import { useRouter } from 'next/navigation'
+
+export default function ResultsPage() {
   const [entries, setEntries] = useState([])
   const [showConfirmClear, setShowConfirmClear] = useState(false)
   const [confirmingDeleteDate, setConfirmingDeleteDate] = useState(null)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const copyToClipboard = async text => {
     try {
       await navigator.clipboard.writeText(text)
-      alert('Link copied to clipboard!')
-    } catch (err) {
-      // Fallback for iOS and older browsers
+      alert('Copied to clipboard!')
+    } catch {
       const textarea = document.createElement('textarea')
       textarea.value = text
       textarea.setAttribute('readonly', '')
@@ -35,17 +33,52 @@ export default function ResultsPage () {
       try {
         document.execCommand('copy')
         alert('Link copied to clipboard!')
-      } catch (err) {
+      } catch {
         alert('Failed to copy link')
       }
       document.body.removeChild(textarea)
     }
   }
 
+  const handlePlayDate = async () => {
+    if (!selectedDate) return
+    setIsLoading(true)
+
+    const userId = getOrCreateAnonId()
+
+    const res = await fetch(`${window.location.origin}/api/check-history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, date: selectedDate })
+    })
+
+    if (!res.ok) {
+      alert('Something went wrong checking history.')
+      setIsLoading(false)
+      return
+    }
+
+    const { data } = await res.json()
+    const alreadyPlayed = data?.length > 0
+
+    if (alreadyPlayed) {
+      const confirmReplay = window.confirm(
+        `You have already played ${selectedDate}. Do you want to replay it?`
+      )
+      if (confirmReplay) {
+        router.push(`/?date=${selectedDate}&replay=true`)
+        return
+      }
+    } else {
+      router.push(`/?date=${selectedDate}`)
+    }
+
+    setIsLoading(false)
+  }
+
   useEffect(() => {
     const fetchResults = async () => {
       const anonId = getOrCreateAnonId()
-      const supabase = createSupabaseClient(anonId)
 
       const { data, error } = await supabase
         .from('game_progress')
@@ -57,17 +90,8 @@ export default function ResultsPage () {
         return
       }
 
-      const sorted = [...data].sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      )
+      const sorted = [...data].sort((a, b) => new Date(b.date) - new Date(a.date))
       setEntries(sorted)
-      console.log(
-        'anonId === row.user_id?',
-        anonId === '1f2c0483-4d9a-4301-b5a2-4170e92b53ba'
-      )
-
-      console.log(anonId)
-      console.log(sorted)
     }
 
     fetchResults()
@@ -82,14 +106,12 @@ export default function ResultsPage () {
       body: JSON.stringify({ user_id: anonId })
     })
 
-    const result = await res.json()
-
     if (!res.ok) {
+      const result = await res.json()
       console.error('❌ Failed to delete progress:', result)
       return
     }
 
-    console.log('✅ Deleted progress')
     setEntries([])
     setShowConfirmClear(false)
   }
@@ -103,100 +125,130 @@ export default function ResultsPage () {
       body: JSON.stringify({ user_id: anonId, date })
     })
 
-    const result = await res.json()
-
     if (!res.ok) {
+      const result = await res.json()
       console.error('Failed to delete entry: ', result)
       return
     }
 
     setEntries(prev => prev.filter(e => e.date !== date))
-    setConfirmingDeleteDate(null) // ✅ reset after successful delete
+    setConfirmingDeleteDate(null)
   }
 
   return (
     <div className='w-full max-w-md mx-auto h-full flex flex-col'>
-      <h1 className='text-lg mb-2 text-neutral-200 font-bold'>
-        PLAY HISTORY
-      </h1>
+      <h1 className='text-xl text-center mb-2 mt-4 text-neutral-200 font-bold'>PLAY ANY DATE</h1>
+
+      <div className='border border-neutral-700 p-4 rounded mb-8'>
+        <div className='flex gap-2 items-center'>
+          <input
+            type='date'
+            className='p-2 rounded grow bg-neutral-800 text-neutral-100 border border-neutral-600'
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+            min="2025-05-21"
+            max={new Date().toISOString().split('T')[0]}
+          />
+          <button
+            onClick={handlePlayDate}
+            disabled={isLoading}
+            className={`p-2 rounded bg-blue-900 hover:bg-blue-800 text-white transition min-w-1/4 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isLoading ? 'Loading...' : 'Play'}
+          </button>
+        </div>
+      </div>
+
+      <h1 className='text-xl text-center mb-2 text-neutral-200 font-bold'>PLAY HISTORY</h1>
+
       {entries.length === 0 ? (
         <p className='text-neutral-400'>No results yet. Play a game first!</p>
       ) : (
-        entries.map(entry => (
-          <div
-            key={entry.date}
-            className='mb-4 border border-neutral-700 p-4 rounded flex'
-          >
-            <div className='grow'>
-              <h2 className='text-base text-neutral-300 font-normal mb-2 flex gap-1 items-center'>
-                <Calendar width={14} height={14} /> {entry.date}
-              </h2>
-              {entry.guesses.map(({ guess }, idx) => {
-                const emojiRow = guess
-                  .map((val, i) =>
-                    val.trim().toLowerCase() ===
-                    entry.correct_order[i].trim().toLowerCase()
-                      ? '🟩'
-                      : '🟥'
+        entries.map(entry => {
+          const lastGuess = entry.guesses[entry.guesses.length - 1]?.guess || []
+          const isCorrect = lastGuess.every(
+            (val, i) => val.trim().toLowerCase() === entry.correct_order[i].trim().toLowerCase()
+          )
+          const borderColor = isCorrect ? 'border-green-300' : 'border-red-300'
+
+          return (
+            <div key={entry.date} className={`mb-4 border ${borderColor} p-4 rounded flex`}>
+              <div className='grow'>
+                <h2 className='text-base text-neutral-300 font-normal mb-2 flex gap-1 items-center'>
+                  <Calendar width={14} height={14} /> {entry.date}
+                </h2>
+                {entry.guesses.map(({ guess }, idx) => {
+                  const emojiRow = guess
+                    .map((val, i) =>
+                      val.trim().toLowerCase() === entry.correct_order[i].trim().toLowerCase()
+                        ? '🟩'
+                        : '🟥'
+                    )
+                    .join('')
+                  return (
+                    <div key={idx} className='text-sm font-mono'>
+                      {idx + 1}/{entry.guesses.length}: {emojiRow}
+                    </div>
                   )
-                  .join('')
-                return (
-                  <div key={idx} className='text-sm font-mono'>
-                    {idx + 1}/{entry.guesses.length}: {emojiRow}
-                  </div>
-                )
-              })}
-            </div>
-            <div className='flex flex-col gap-2 justify-center'>
-              <button
-                onClick={() =>
-                  confirmingDeleteDate === entry.date
-                    ? handleDeleteResult(entry.date)
-                    : setConfirmingDeleteDate(entry.date)
-                }
-                className={`text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition hover:cursor-pointer flex gap-2 items-center justify-start ${
-                  confirmingDeleteDate === entry.date
-                    ? 'border-red-400 text-red-300'
-                    : ''
-                }`}
-              >
-                <Delete width={14} height={14} />
-                {confirmingDeleteDate === entry.date
-                  ? 'Delete?'
-                  : 'Delete'}
-              </button>
+                })}
+              </div>
 
-              <button
-                onClick={() =>
-                  copyToClipboard(`${window.location.origin}/${entry.date}`)
-                }
-                className='text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition hover:cursor-pointer flex gap-2 items-center justify-start'
-              >
-                <Copy width={14} height={14} />
-                Copy Link
-              </button>
+              <div className='flex flex-col gap-2 justify-center'>
+                <button
+                  onClick={() =>
+                    confirmingDeleteDate === entry.date
+                      ? handleDeleteResult(entry.date)
+                      : setConfirmingDeleteDate(entry.date)
+                  }
+                  className={`text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition flex gap-2 items-center justify-start ${confirmingDeleteDate === entry.date ? 'border-red-400 text-red-300' : ''}`}
+                >
+                  <Delete width={14} height={14} />
+                  {confirmingDeleteDate === entry.date ? 'Delete?' : 'Delete'}
+                </button>
 
-              <Link
-                href={`/?date=${entry.date}&replay=true`}
-                className='text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition hover:cursor-pointer gap-2 flex items-center justify-start'
-              >
-                <ReplyAll width={14} height={14} />
-                Replay
-              </Link>
+                <button
+                  onClick={() => {
+                    const resultString = `Unconfigure.com results from ${entry.date}\n` + entry.guesses.map(({ guess }, idx) => {
+                      const emojiRow = guess
+                        .map((val, i) =>
+                          val.trim().toLowerCase() === entry.correct_order[i].trim().toLowerCase()
+                            ? '🟩'
+                            : '🟥'
+                        )
+                        .join('')
+                      return `${idx + 1}/${entry.guesses.length}: ${emojiRow}`
+                    }).join('\n')
+
+                    copyToClipboard(resultString)
+                  }}
+                  className='text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition flex gap-2 items-center justify-start'
+                >
+                  <Copy width={14} height={14} />
+                  Copy Result
+                </button>
+
+                <Link
+                  href={`/?date=${entry.date}&replay=true`}
+                  className='text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition flex gap-2 items-center justify-start'
+                >
+                  <ReplyAll width={14} height={14} />
+                  Replay
+                </Link>
+              </div>
             </div>
-          </div>
-        ))
+          )
+        })
       )}
 
       <div className='grow'></div>
 
-      <div className='w-full flex flex-col gap-[6px] my-6'>
+      <div className='w-full flex flex-col gap-2 my-6'>
         {showConfirmClear && (
-          <div className='flex fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md flex-col gap-4 p-4 border-y border-red-300 rounded bg-neutral-900 mb-2'>
+          <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md flex-col gap-4 p-4 border-y border-red-300 rounded bg-neutral-900 mb-2'>
             <p className='text-red-300 text-xl text-center font-bold'>
               Are you sure you want to clear all of your personal results?
             </p>
-            <div className='flex gap-2 justify-center'>
+            <div className='flex gap-2 justify-center mt-4'>
               <button
                 onClick={handleClearResults}
                 className='text-sm p-3 border border-red-300 text-red-300 rounded hover:bg-red-800'
@@ -207,7 +259,7 @@ export default function ResultsPage () {
                 onClick={() => setShowConfirmClear(false)}
                 className='text-sm px-3 py-3 border border-blue-200 text-blue-200 rounded hover:bg-neutral-800'
               >
-                Nevermind! I want to keep my play history.
+                Nevermind! Keep history.
               </button>
             </div>
           </div>
@@ -215,14 +267,14 @@ export default function ResultsPage () {
 
         <button
           onClick={() => setShowConfirmClear(true)}
-          className='flex items-center gap-1 justify-center text-sm text-red-400 border border-red-400 p-4 rounded hover:text-red-300 hover:border-red-300 hover:cursor-pointer transition-all duration-75'
+          className='flex items-center gap-1 justify-center text-sm text-red-400 border border-red-400 p-4 rounded hover:text-red-300 hover:border-red-300 transition'
         >
           <LucideDelete width={14} height={14} />
           Clear Historical Results
         </button>
 
         <Link href='/'>
-          <button className='flex items-center justify-center gap-1 w-full text-sm text-neutral-300 border border-neutral-300 p-4 rounded hover:text-neutral-100 hover:border-neutral-100 hover:cursor-pointer transition-all duration-75'>
+          <button className='flex items-center justify-center gap-1 w-full text-sm text-neutral-300 border border-neutral-300 p-4 rounded hover:text-neutral-100 hover:border-neutral-100 transition'>
             <ArrowLeft width={14} height={14} />
             Return to game
           </button>

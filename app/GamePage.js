@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { shuffle } from '@/utils/utils'
+import { shuffle, isValidGameDate } from '@/utils/utils'
 import { MAX_GUESSES } from '@/utils/constants'
 import Header from '@/components/Header'
 import GameBoard from '@/components/GameBoard'
@@ -14,16 +14,21 @@ import useStore from './store/store'
 import { slotLockingStrategy } from '@/utils/slotLockingStrategy'
 import { createSupabaseClient } from '@/lib/supabaseClient'
 import { getOrCreateAnonId } from '@/utils/userId'
+import { supabase } from '@/lib/supabaseClient'
 
-export default function UnorderPage () {
+
+export default function UnorderPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const dateParam = searchParams.get('date')
   const replay = searchParams.get('replay') === 'true'
 
+  const todayDateString = new Date().toISOString().split('T')[0]
   const today = dateParam || new Date().toLocaleDateString('en-CA')
   const progressKey = `progress-${today}`
   const devMode = useStore(state => state.devMode)
 
+  const [dateIsValid, setDateIsValid] = useState(false)
   const [items, setItems] = useState([])
   const [correctOrder, setCorrectOrder] = useState([])
   const [inventionDates, setInventionDates] = useState({})
@@ -36,32 +41,30 @@ export default function UnorderPage () {
   const [loading, setLoading] = useState(true)
   const [showContent, setShowContent] = useState(false)
   const [loadingScreenVisible, setLoadingScreenVisible] = useState(true)
-
   const hudTimeoutRef = useRef(null)
 
-  // Loading animation screen
+  // Validate date param on mount
   useEffect(() => {
-    if (!loading) {
-      const seen = sessionStorage.getItem('seenLoadingScreen')
-      if (seen) {
-        setShowContent(true)
-        setLoadingScreenVisible(false)
-      } else {
-        sessionStorage.setItem('seenLoadingScreen', 'true')
-        setTimeout(() => {
-          setShowContent(true)
-          setLoadingScreenVisible(false)
-        }, 700)
-      }
+    if (!dateParam) {
+      setDateIsValid(true)
+      return
     }
-  }, [loading])
 
-  // Main game data load
+    if (!isValidGameDate(dateParam)) {
+      alert(`Invalid date: ${dateParam}. Please select a valid available date.`)
+      router.push('/')
+    } else {
+      setDateIsValid(true)
+    }
+  }, [dateParam, router])
+
+  // Load game data after valid date check
   useEffect(() => {
+    if (!dateIsValid) return
+
     const fetchGameData = async () => {
-      // Always instantiate client *inside* effect/handler
       const userId = getOrCreateAnonId()
-      const supabase = createSupabaseClient(userId)
+      // const supabase = createSupabaseClient(userId)
 
       const { data, error } = await supabase
         .from('daily_games')
@@ -88,8 +91,6 @@ export default function UnorderPage () {
       setCorrectOrder(game.inventions)
       setInventionDates(cleanedDates)
 
-      // Now handle user progress from Supabase (never top-level)
-
       if (!replay) {
         try {
           const response = await fetch(
@@ -100,11 +101,7 @@ export default function UnorderPage () {
           if (response.ok && result.data?.guesses?.length > 0) {
             const savedGame = result.data
             setSubmittedGuesses(savedGame.guesses)
-            setItems(
-              savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
-            )
-            setCorrectOrder(savedGame.correct_order || [])
-            setInventionDates(savedGame.invention_dates || {})
+            setItems(savedGame.guesses.at(-1)?.guess || shuffle(game.inventions))
             setGameOver(true)
             setViewMode('guess')
             setLoading(false)
@@ -136,10 +133,25 @@ export default function UnorderPage () {
     }
 
     fetchGameData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [dateIsValid, today, replay])
 
-  // Persist progress locally (not server) during play
+  // Handle loading splash screen
+  useEffect(() => {
+    if (!loading) {
+      const seen = sessionStorage.getItem('seenLoadingScreen')
+      if (seen) {
+        setShowContent(true)
+        setLoadingScreenVisible(false)
+      } else {
+        sessionStorage.setItem('seenLoadingScreen', 'true')
+        setTimeout(() => {
+          setShowContent(true)
+          setLoadingScreenVisible(false)
+        }, 700)
+      }
+    }
+  }, [loading])
+
   useEffect(() => {
     if (!gameOver && correctOrder.length > 0) {
       localStorage.setItem(
@@ -147,13 +159,10 @@ export default function UnorderPage () {
         JSON.stringify({ items, guesses: submittedGuesses })
       )
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, submittedGuesses, gameOver, correctOrder])
+  }, [items, submittedGuesses, gameOver, correctOrder, progressKey])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 0, tolerance: 0 }
-    })
+    useSensor(PointerSensor, { activationConstraint: { delay: 0, tolerance: 0 } })
   )
 
   const onDragEnd = ({ active, over }) => {
@@ -170,10 +179,7 @@ export default function UnorderPage () {
     }, [])
 
     const newItems = slotLockingStrategy(
-      items,
-      active.id,
-      over.id,
-      lockedIndexes
+      items, active.id, over.id, lockedIndexes
     )
     if (newItems === items) return
     setItems(newItems)
@@ -202,14 +208,8 @@ export default function UnorderPage () {
       startVelocity: 60,
       gravity: 1,
       colors: [
-        '#fbcfe8',
-        '#a5f3fc',
-        '#d8b4fe',
-        '#fde68a',
-        '#bbf7d0',
-        '#fecaca',
-        '#e0e7ff',
-        '#fcd5ce'
+        '#fbcfe8', '#a5f3fc', '#d8b4fe', '#fde68a',
+        '#bbf7d0', '#fecaca', '#e0e7ff', '#fcd5ce'
       ]
     })
   }
@@ -223,13 +223,9 @@ export default function UnorderPage () {
     setSubmittedGuesses(newGuesses)
 
     const userId = getOrCreateAnonId()
-    const supabase = createSupabaseClient(userId)
+    // const supabase = createSupabaseClient(userId)
 
-    const result = isCorrect
-      ? 'win'
-      : newGuesses.length >= MAX_GUESSES
-      ? 'lose'
-      : 'in_progress'
+    const result = isCorrect ? 'win' : newGuesses.length >= MAX_GUESSES ? 'lose' : 'in_progress'
 
     if (isCorrect) {
       triggerConfetti()
@@ -243,7 +239,6 @@ export default function UnorderPage () {
       revealResult()
     }
 
-    // Only save to server if game is over
     if (result !== 'in_progress') {
       const payload = {
         user_id: userId,
@@ -310,25 +305,15 @@ export default function UnorderPage () {
 
   return (
     <>
-      <div
-        className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${
-          loadingScreenVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
+      <div className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${loadingScreenVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className='text-xl animate-bounce'>Loading configuration...</div>
       </div>
 
       {showContent && (
         <div className='min-h-full flex flex-col transition-colors'>
-          <div
-            id='hud'
-            className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]'
-          />
+          <div id='hud' className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]' />
           <div className='grow'>
-            <motion.div
-              animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div animate={flash ? { x: [0, -8, 8, -8, 0] } : {}} transition={{ duration: 0.15 }}>
               <div className='w-full max-w-md mx-auto'>
                 <GameBoard
                   items={boardItems}
@@ -345,20 +330,18 @@ export default function UnorderPage () {
                 />
               </div>
             </motion.div>
+
             {gameOver && (
               <div className='max-w-md mt-2 mx-auto text-center font-light animate-bounce'>
-                {submittedGuesses.at(-1)?.isCorrect
-                  ? '🎉 Nicely done!'
-                  : '😞 Better luck next time!'}
+                {submittedGuesses.at(-1)?.isCorrect ? '🎉 Nicely done!' : '😞 Better luck next time!'}
               </div>
             )}
-            <button
-              className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`}
-              onClick={triggerConfetti}
-            >
+
+            <button className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`} onClick={triggerConfetti}>
               Simulate Correct Response
             </button>
           </div>
+
           <Footer
             submittedGuesses={submittedGuesses}
             gameOver={gameOver}

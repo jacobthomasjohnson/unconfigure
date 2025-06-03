@@ -11,7 +11,7 @@ const nextConfig = {
     ignoreBuildErrors: true // ✅ Don't block build on TS errors (safe if you're not using TS)
   },
   experimental: {
-    serverActions: false // ✅ (just in case it's enabled)
+    // serverActions: false // ✅ (just in case it's enabled)
   }
 }
 
