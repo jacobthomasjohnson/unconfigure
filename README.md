@@ -19,16 +19,31 @@ Each day you get a shuffled list of inventions, discoveries, or cultural moments
 
 ## Quick Start
 
-```bash
 # 1. Clone
+```bash
 git clone https://github.com/yourhandle/unconfigure.git
 cd unconfigure
+```
 
-# 2. Install deps
-pnpm install   # or npm / yarn
+# 2. Install dependencies
+```bash
+npm install
+```
 
-# 3. Add your Supabase keys
+# 3. Add your own Supabase keys
+```bash
 cp .env.example .env.local   # fill in the blanks
+```
 
 # 4. Dev server
-pnpm dev
+```bash
+npm run dev
+```
+
+# 5. Run it!
+Open http://localhost:3000 and start re-ordering history. 🚀
+
+## Roadmap
+Mobile haptics on correct drop
+
+Made with ☕ by Jacob. PRs & feedback welcome!
