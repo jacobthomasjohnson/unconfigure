@@ -12,14 +12,13 @@ import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import useStore from './store/store'
 import { slotLockingStrategy } from '@/utils/slotLockingStrategy'
-import { createSupabaseClient } from '@/lib/supabaseClient'
 import { getOrCreateAnonId } from '@/utils/userId'
 import { supabase } from '@/lib/supabaseClient'
 
-
-export default function UnorderPage() {
+export default function UnorderPage () {
   const router = useRouter()
   const searchParams = useSearchParams()
+  console.log(searchParams)
   const dateParam = searchParams.get('date')
   const replay = searchParams.get('replay') === 'true'
 
@@ -43,7 +42,6 @@ export default function UnorderPage() {
   const [loadingScreenVisible, setLoadingScreenVisible] = useState(true)
   const hudTimeoutRef = useRef(null)
 
-  // Validate date param on mount
   useEffect(() => {
     if (!dateParam) {
       setDateIsValid(true)
@@ -58,13 +56,11 @@ export default function UnorderPage() {
     }
   }, [dateParam, router])
 
-  // Load game data after valid date check
   useEffect(() => {
     if (!dateIsValid) return
 
     const fetchGameData = async () => {
       const userId = getOrCreateAnonId()
-      // const supabase = createSupabaseClient(userId)
 
       const { data, error } = await supabase
         .from('daily_games')
@@ -101,7 +97,9 @@ export default function UnorderPage() {
           if (response.ok && result.data?.guesses?.length > 0) {
             const savedGame = result.data
             setSubmittedGuesses(savedGame.guesses)
-            setItems(savedGame.guesses.at(-1)?.guess || shuffle(game.inventions))
+            setItems(
+              savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
+            )
             setGameOver(true)
             setViewMode('guess')
             setLoading(false)
@@ -135,7 +133,6 @@ export default function UnorderPage() {
     fetchGameData()
   }, [dateIsValid, today, replay])
 
-  // Handle loading splash screen
   useEffect(() => {
     if (!loading) {
       const seen = sessionStorage.getItem('seenLoadingScreen')
@@ -162,7 +159,9 @@ export default function UnorderPage() {
   }, [items, submittedGuesses, gameOver, correctOrder, progressKey])
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 0, tolerance: 0 } })
+    useSensor(PointerSensor, {
+      activationConstraint: { delay: 0, tolerance: 0 }
+    })
   )
 
   const onDragEnd = ({ active, over }) => {
@@ -179,7 +178,10 @@ export default function UnorderPage() {
     }, [])
 
     const newItems = slotLockingStrategy(
-      items, active.id, over.id, lockedIndexes
+      items,
+      active.id,
+      over.id,
+      lockedIndexes
     )
     if (newItems === items) return
     setItems(newItems)
@@ -208,8 +210,14 @@ export default function UnorderPage() {
       startVelocity: 60,
       gravity: 1,
       colors: [
-        '#fbcfe8', '#a5f3fc', '#d8b4fe', '#fde68a',
-        '#bbf7d0', '#fecaca', '#e0e7ff', '#fcd5ce'
+        '#fbcfe8',
+        '#a5f3fc',
+        '#d8b4fe',
+        '#fde68a',
+        '#bbf7d0',
+        '#fecaca',
+        '#e0e7ff',
+        '#fcd5ce'
       ]
     })
   }
@@ -223,9 +231,12 @@ export default function UnorderPage() {
     setSubmittedGuesses(newGuesses)
 
     const userId = getOrCreateAnonId()
-    // const supabase = createSupabaseClient(userId)
 
-    const result = isCorrect ? 'win' : newGuesses.length >= MAX_GUESSES ? 'lose' : 'in_progress'
+    const result = isCorrect
+      ? 'win'
+      : newGuesses.length >= MAX_GUESSES
+      ? 'lose'
+      : 'in_progress'
 
     if (isCorrect) {
       triggerConfetti()
@@ -305,16 +316,26 @@ export default function UnorderPage() {
 
   return (
     <>
-      <div className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${loadingScreenVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div
+        className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${
+          loadingScreenVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
         <div className='text-xl animate-bounce'>Loading configuration...</div>
       </div>
 
       {showContent && (
         <div className='min-h-full flex flex-col transition-colors'>
           <Header currentDate={today} />
-          <div id='hud' className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]' />
+          <div
+            id='hud'
+            className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]'
+          />
           <div className='grow'>
-            <motion.div animate={flash ? { x: [0, -8, 8, -8, 0] } : {}} transition={{ duration: 0.15 }}>
+            <motion.div
+              animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
+              transition={{ duration: 0.15 }}
+            >
               <div className='w-full max-w-md mx-auto'>
                 <GameBoard
                   items={boardItems}
@@ -334,11 +355,16 @@ export default function UnorderPage() {
 
             {gameOver && (
               <div className='max-w-md mt-2 mx-auto text-center font-light animate-bounce'>
-                {submittedGuesses.at(-1)?.isCorrect ? '🎉 Nicely done!' : '😞 Better luck next time!'}
+                {submittedGuesses.at(-1)?.isCorrect
+                  ? '🎉 Nicely done!'
+                  : '😞 Better luck next time!'}
               </div>
             )}
 
-            <button className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`} onClick={triggerConfetti}>
+            <button
+              className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`}
+              onClick={triggerConfetti}
+            >
               Simulate Correct Response
             </button>
           </div>
