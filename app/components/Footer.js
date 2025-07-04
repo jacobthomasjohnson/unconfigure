@@ -50,7 +50,7 @@ export default function Footer ({
   }
 
   return (
-    <footer className='w-full bg-neutral-900 py-4 pb-6'>
+    <footer className='w-full bg-neutral-900 py-2 pb-6'>
       <div className='max-w-md mx-auto flex flex-col gap-2'>
         {showToggle && (
           <button
