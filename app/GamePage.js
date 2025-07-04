@@ -1,204 +1,215 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { shuffle, isValidGameDate } from '@/utils/utils'
-import { MAX_GUESSES } from '@/utils/constants'
-import Header from '@/components/Header'
-import GameBoard from '@/components/GameBoard'
-import Footer from '@/components/Footer'
-import { motion } from 'framer-motion'
-import confetti from 'canvas-confetti'
-import useStore from './store/store'
-import { slotLockingStrategy } from '@/utils/slotLockingStrategy'
-import { createSupabaseClient } from '@/lib/supabaseClient'
-import { getOrCreateAnonId } from '@/utils/userId'
-import { supabase } from '@/lib/supabaseClient'
-
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { shuffle, isValidGameDate } from "@/utils/utils";
+import { MAX_GUESSES } from "@/utils/constants";
+import Header from "@/components/Header";
+import GameBoard from "@/components/GameBoard";
+import Footer from "@/components/Footer";
+import { motion } from "framer-motion";
+import confetti from "canvas-confetti";
+import useStore from "./store/store";
+import { slotLockingStrategy } from "@/utils/slotLockingStrategy";
+import { getOrCreateAnonId } from "@/utils/userId";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function UnorderPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const dateParam = searchParams.get('date')
-  const replay = searchParams.get('replay') === 'true'
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get("date");
+  const replay = searchParams.get("replay") === "true";
 
-  const todayDateString = new Date().toISOString().split('T')[0]
-  const today = dateParam || new Date().toLocaleDateString('en-CA')
-  const progressKey = `progress-${today}`
-  const devMode = useStore(state => state.devMode)
+  const todayDateString = new Date().toISOString().split("T")[0];
+  const today = dateParam || new Date().toLocaleDateString("en-CA");
+  const progressKey = `progress-${today}`;
+  const devMode = useStore((state) => state.devMode);
 
-  const [dateIsValid, setDateIsValid] = useState(false)
-  const [items, setItems] = useState([])
-  const [correctOrder, setCorrectOrder] = useState([])
-  const [inventionDates, setInventionDates] = useState({})
-  const [submittedGuesses, setSubmittedGuesses] = useState([])
-  const [gameOver, setGameOver] = useState(false)
-  const [revealInProgress, setRevealInProgress] = useState(false)
-  const [revealStep, setRevealStep] = useState(-1)
-  const [flash, setFlash] = useState(false)
-  const [viewMode, setViewMode] = useState('guess')
-  const [loading, setLoading] = useState(true)
-  const [showContent, setShowContent] = useState(false)
-  const [loadingScreenVisible, setLoadingScreenVisible] = useState(true)
-  const hudTimeoutRef = useRef(null)
+  const [dateIsValid, setDateIsValid] = useState(false);
+  const [items, setItems] = useState([]);
+  const [correctOrder, setCorrectOrder] = useState([]);
+  const [inventionDates, setInventionDates] = useState({});
+  const [submittedGuesses, setSubmittedGuesses] = useState([]);
+  const [gameOver, setGameOver] = useState(false);
+  const [revealInProgress, setRevealInProgress] = useState(false);
+  const [revealStep, setRevealStep] = useState(-1);
+  const [flash, setFlash] = useState(false);
+  const [viewMode, setViewMode] = useState("guess");
+  const [loading, setLoading] = useState(true);
+  const [showContent, setShowContent] = useState(false);
+  const [loadingScreenVisible, setLoadingScreenVisible] = useState(true);
+  const hudTimeoutRef = useRef(null);
 
   // Validate date param on mount
   useEffect(() => {
     if (!dateParam) {
-      setDateIsValid(true)
-      return
+          console.log("dateParam:", dateParam);
+    console.log("today:", today);
+      setDateIsValid(true);
+      return;
     }
 
     if (!isValidGameDate(dateParam)) {
-      alert(`Invalid date: ${dateParam}. Please select a valid available date.`)
-      router.push('/')
+      alert(
+        `Invalid date: ${dateParam}. Please select a valid available date.`
+      );
+      router.push("/");
     } else {
-      setDateIsValid(true)
+      setDateIsValid(true);
     }
-  }, [dateParam, router])
 
-  // Load game data after valid date check
+
+  }, [dateParam, router]);
+
   useEffect(() => {
-    if (!dateIsValid) return
+    if (!dateIsValid) return;
 
     const fetchGameData = async () => {
-      const userId = getOrCreateAnonId()
-      // const supabase = createSupabaseClient(userId)
+      const userId = getOrCreateAnonId();
 
       const { data, error } = await supabase
-        .from('daily_games')
-        .select('*')
-        .eq('date', today)
+        .from("daily_games")
+        .select("*")
+        .eq("date", today);
 
       if (error) {
-        console.error('Error fetching daily game:', error)
-        setLoading(false)
-        return
+        console.error("Error fetching daily game:", error);
+        setLoading(false);
+        return;
       }
 
-      const game = data?.[0]
+      const game = data?.[0];
       if (!game) {
-        console.error('No game found for today')
-        setLoading(false)
-        return
+        console.error("No game found for today");
+        setLoading(false);
+        return;
       }
 
       const cleanedDates = Object.fromEntries(
         Object.entries(game.invention_dates).map(([k, v]) => [k.trim(), v])
-      )
+      );
 
-      setCorrectOrder(game.inventions)
-      setInventionDates(cleanedDates)
+      setCorrectOrder(game.inventions);
+      setInventionDates(cleanedDates);
 
       if (!replay) {
         try {
           const response = await fetch(
             `/api/get-progress?user_id=${userId}&date=${today}`
-          )
-          const result = await response.json()
+          );
+          const result = await response.json();
 
           if (response.ok && result.data?.guesses?.length > 0) {
-            const savedGame = result.data
-            setSubmittedGuesses(savedGame.guesses)
-            setItems(savedGame.guesses.at(-1)?.guess || shuffle(game.inventions))
-            setGameOver(true)
-            setViewMode('guess')
-            setLoading(false)
-            return
+            const savedGame = result.data;
+            setSubmittedGuesses(savedGame.guesses);
+            setItems(
+              savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
+            );
+            setGameOver(true);
+            setViewMode("guess");
+            setLoading(false);
+            return;
           }
         } catch (err) {
-          console.warn('Failed to fetch saved progress:', err)
+          console.warn("Failed to fetch saved progress:", err);
         }
       }
 
-      const progress = localStorage.getItem(progressKey)
+      const progress = localStorage.getItem(progressKey);
       if (progress && !replay) {
-        const parsed = JSON.parse(progress)
+        const parsed = JSON.parse(progress);
         const validItems =
           Array.isArray(parsed.items) && parsed.items.length > 0
             ? parsed.items
-            : shuffle(game.inventions)
+            : shuffle(game.inventions);
 
-        const validGuesses = Array.isArray(parsed.guesses) ? parsed.guesses : []
+        const validGuesses = Array.isArray(parsed.guesses)
+          ? parsed.guesses
+          : [];
 
-        setItems(validItems)
-        setSubmittedGuesses(validGuesses)
+        setItems(validItems);
+        setSubmittedGuesses(validGuesses);
       } else {
-        setItems(shuffle(game.inventions))
-        setSubmittedGuesses([])
+        setItems(shuffle(game.inventions));
+        setSubmittedGuesses([]);
       }
 
-      setLoading(false)
-    }
+      setLoading(false);
+    };
 
-    fetchGameData()
-  }, [dateIsValid, today, replay])
+    fetchGameData();
+  }, [dateIsValid, today, replay]);
 
   // Handle loading splash screen
   useEffect(() => {
     if (!loading) {
-      const seen = sessionStorage.getItem('seenLoadingScreen')
+      const seen = sessionStorage.getItem("seenLoadingScreen");
       if (seen) {
-        setShowContent(true)
-        setLoadingScreenVisible(false)
+        setShowContent(true);
+        setLoadingScreenVisible(false);
       } else {
-        sessionStorage.setItem('seenLoadingScreen', 'true')
+        sessionStorage.setItem("seenLoadingScreen", "true");
         setTimeout(() => {
-          setShowContent(true)
-          setLoadingScreenVisible(false)
-        }, 700)
+          setShowContent(true);
+          setLoadingScreenVisible(false);
+        }, 700);
       }
     }
-  }, [loading])
+  }, [loading]);
 
   useEffect(() => {
     if (!gameOver && correctOrder.length > 0) {
       localStorage.setItem(
         progressKey,
         JSON.stringify({ items, guesses: submittedGuesses })
-      )
+      );
     }
-  }, [items, submittedGuesses, gameOver, correctOrder, progressKey])
+  }, [items, submittedGuesses, gameOver, correctOrder, progressKey]);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 0, tolerance: 0 } })
-  )
+    useSensor(PointerSensor, {
+      activationConstraint: { delay: 0, tolerance: 0 },
+    })
+  );
 
   const onDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return
+    if (!over || active.id === over.id) return;
 
-    const oldIndex = items.indexOf(active.id)
-    const newIndex = items.indexOf(over.id)
-    const lastGuess = submittedGuesses.at(-1)?.guess || []
+    const oldIndex = items.indexOf(active.id);
+    const newIndex = items.indexOf(over.id);
+    const lastGuess = submittedGuesses.at(-1)?.guess || [];
 
     const lockedIndexes = correctOrder.reduce((acc, id, idx) => {
       if (lastGuess[idx]?.trim().toLowerCase() === id.trim().toLowerCase())
-        acc.push(idx)
-      return acc
-    }, [])
+        acc.push(idx);
+      return acc;
+    }, []);
 
     const newItems = slotLockingStrategy(
-      items, active.id, over.id, lockedIndexes
-    )
-    if (newItems === items) return
-    setItems(newItems)
+      items,
+      active.id,
+      over.id,
+      lockedIndexes
+    );
+    if (newItems === items) return;
+    setItems(newItems);
 
     localStorage.setItem(
       progressKey,
       JSON.stringify({ items: newItems, guesses: submittedGuesses })
-    )
-  }
+    );
+  };
 
-  const hudMessage = msg => {
-    const hud = document.getElementById('hud')
-    if (!hud) return
-    if (hudTimeoutRef.current) clearTimeout(hudTimeoutRef.current)
-    hud.innerText = msg
+  const hudMessage = (msg) => {
+    const hud = document.getElementById("hud");
+    if (!hud) return;
+    if (hudTimeoutRef.current) clearTimeout(hudTimeoutRef.current);
+    hud.innerText = msg;
     hudTimeoutRef.current = setTimeout(() => {
-      hudTimeoutRef.current = null
-    }, 3000)
-  }
+      hudTimeoutRef.current = null;
+    }, 3000);
+  };
 
   const triggerConfetti = () => {
     confetti({
@@ -208,114 +219,134 @@ export default function UnorderPage() {
       startVelocity: 60,
       gravity: 1,
       colors: [
-        '#fbcfe8', '#a5f3fc', '#d8b4fe', '#fde68a',
-        '#bbf7d0', '#fecaca', '#e0e7ff', '#fcd5ce'
-      ]
-    })
-  }
+        "#fbcfe8",
+        "#a5f3fc",
+        "#d8b4fe",
+        "#fde68a",
+        "#bbf7d0",
+        "#fecaca",
+        "#e0e7ff",
+        "#fcd5ce",
+      ],
+    });
+  };
 
   const handleSubmit = async () => {
-    const normalize = s => s.trim().toLowerCase()
+    const normalize = (s) => s.trim().toLowerCase();
     const isCorrect = items.every(
       (item, i) => normalize(item) === normalize(correctOrder[i])
-    )
-    const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }]
-    setSubmittedGuesses(newGuesses)
+    );
+    const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }];
+    setSubmittedGuesses(newGuesses);
 
-    const userId = getOrCreateAnonId()
+    const userId = getOrCreateAnonId();
     // const supabase = createSupabaseClient(userId)
 
-    const result = isCorrect ? 'win' : newGuesses.length >= MAX_GUESSES ? 'lose' : 'in_progress'
+    const result = isCorrect
+      ? "win"
+      : newGuesses.length >= MAX_GUESSES
+      ? "lose"
+      : "in_progress";
 
     if (isCorrect) {
-      triggerConfetti()
-      setGameOver(true)
-      hudMessage('Correct! Well done.')
+      triggerConfetti();
+      setGameOver(true);
+      hudMessage("Correct! Well done.");
     }
 
-    if (result === 'lose') {
-      setGameOver(true)
-      hudMessage('Incorrect. Better luck next time!')
-      revealResult()
+    if (result === "lose") {
+      setGameOver(true);
+      hudMessage("Incorrect. Better luck next time!");
+      revealResult();
     }
 
-    if (result !== 'in_progress') {
+    if (result !== "in_progress") {
       const payload = {
         user_id: userId,
         date: today,
         guesses: newGuesses,
         correct_order: correctOrder,
         invention_dates: inventionDates,
-        result
-      }
+        result,
+      };
 
       try {
-        const response = await fetch('/api/save-progress', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        })
+        const response = await fetch("/api/save-progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-        const data = await response.json()
+        const data = await response.json();
 
         if (!response.ok || data.error) {
-          console.error('❌ Failed to save result to server:', data.error)
-          hudMessage('❌ Failed to save result to server.')
+          console.error("❌ Failed to save result to server:", data.error);
+          hudMessage("❌ Failed to save result to server.");
         } else {
-          console.log('✅ Game progress saved via API')
+          console.log("✅ Game progress saved via API");
         }
       } catch (err) {
-        console.error('❌ Network error while saving progress:', err)
-        hudMessage('❌ Could not connect to server.')
+        console.error("❌ Network error while saving progress:", err);
+        hudMessage("❌ Could not connect to server.");
       }
 
-      localStorage.removeItem(progressKey)
-      return
+      localStorage.removeItem(progressKey);
+      return;
     }
 
-    hudMessage('Incorrect! Try again.')
-    setFlash(true)
-    setTimeout(() => setFlash(false), 200)
-  }
+    hudMessage("Incorrect! Try again.");
+    setFlash(true);
+    setTimeout(() => setFlash(false), 200);
+  };
 
   const revealResult = () => {
-    setRevealInProgress(true)
-    let step = 0
+    setRevealInProgress(true);
+    let step = 0;
     const loop = () => {
-      if (step >= items.length) return setRevealInProgress(false)
-      setRevealStep(step++)
-      setTimeout(loop, 250)
-    }
-    loop()
-  }
+      if (step >= items.length) return setRevealInProgress(false);
+      setRevealStep(step++);
+      setTimeout(loop, 250);
+    };
+    loop();
+  };
 
   const reset = () => {
-    setItems(shuffle(correctOrder))
-    setSubmittedGuesses([])
-    setGameOver(false)
-    setRevealInProgress(false)
-    setRevealStep(-1)
-    setViewMode('guess')
-  }
+    setItems(shuffle(correctOrder));
+    setSubmittedGuesses([]);
+    setGameOver(false);
+    setRevealInProgress(false);
+    setRevealStep(-1);
+    setViewMode("guess");
+  };
 
-  const lastGuess = submittedGuesses.at(-1)?.guess || []
-  const guessesLeft = MAX_GUESSES - submittedGuesses.length
-  const showCorrectView = viewMode === 'correct'
-  const boardItems = showCorrectView ? correctOrder : items
+  const lastGuess = submittedGuesses.at(-1)?.guess || [];
+  const guessesLeft = MAX_GUESSES - submittedGuesses.length;
+  const showCorrectView = viewMode === "correct";
+  const boardItems = showCorrectView ? correctOrder : items;
 
   return (
     <>
-      <div className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${loadingScreenVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className='text-xl animate-bounce'>Loading configuration...</div>
+      <div
+        className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${
+          loadingScreenVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="text-xl animate-bounce">Loading configuration...</div>
       </div>
 
       {showContent && (
-        <div className='min-h-full flex flex-col transition-colors'>
+        <div className="min-h-full flex flex-col transition-colors">
           <Header currentDate={today} />
-          <div id='hud' className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]' />
-          <div className='grow'>
-            <motion.div animate={flash ? { x: [0, -8, 8, -8, 0] } : {}} transition={{ duration: 0.15 }}>
-              <div className='w-full max-w-md mx-auto'>
+          <div
+            id="hud"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]"
+          />
+          <div className="grow">
+            <motion.div
+              animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
+              transition={{ duration: 0.15 }}
+            >
+              <div className="w-full max-w-md mx-auto">
                 <GameBoard
                   items={boardItems}
                   sensors={sensors}
@@ -333,12 +364,17 @@ export default function UnorderPage() {
             </motion.div>
 
             {gameOver && (
-              <div className='max-w-md mt-2 mx-auto text-center font-light animate-bounce'>
-                {submittedGuesses.at(-1)?.isCorrect ? '🎉 Nicely done!' : '😞 Better luck next time!'}
+              <div className="max-w-md mt-2 mx-auto text-center font-light animate-bounce">
+                {submittedGuesses.at(-1)?.isCorrect
+                  ? "🎉 Nicely done!"
+                  : "😞 Better luck next time!"}
               </div>
             )}
 
-            <button className={`p-4 border rounded ${devMode ? 'visible' : 'hidden'}`} onClick={triggerConfetti}>
+            <button
+              className={`p-4 border rounded ${devMode ? "visible" : "hidden"}`}
+              onClick={triggerConfetti}
+            >
               Simulate Correct Response
             </button>
           </div>
@@ -362,5 +398,5 @@ export default function UnorderPage() {
         </div>
       )}
     </>
-  )
+  );
 }

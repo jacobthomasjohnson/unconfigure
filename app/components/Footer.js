@@ -120,7 +120,7 @@ export default function Footer ({
 
           <Link
             href='/results'
-            className='text-blue-200 text-sm p-4 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
+            className='text-primary border-primary text-sm p-4 text-center border rounded-md flex gap-2 items-center justify-center w-1/2'
           >
             View Past Results <History width={16} height={16} />
           </Link>
