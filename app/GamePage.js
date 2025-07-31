@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { shuffle, isValidGameDate } from "@/utils/utils";
 import { MAX_GUESSES } from "@/utils/constants";
 import Header from "@/components/Header";
@@ -11,7 +10,6 @@ import Footer from "@/components/Footer";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import useStore from "./store/store";
-import { slotLockingStrategy } from "@/utils/slotLockingStrategy";
 import { getOrCreateAnonId } from "@/utils/userId";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -21,7 +19,6 @@ export default function UnorderPage() {
   const dateParam = searchParams.get("date");
   const replay = searchParams.get("replay") === "true";
 
-  const todayDateString = new Date().toISOString().split("T")[0];
   const today = dateParam || new Date().toLocaleDateString("en-CA");
   const progressKey = `progress-${today}`;
   const devMode = useStore((state) => state.devMode);
@@ -44,12 +41,9 @@ export default function UnorderPage() {
   // Validate date param on mount
   useEffect(() => {
     if (!dateParam) {
-          console.log("dateParam:", dateParam);
-    console.log("today:", today);
       setDateIsValid(true);
       return;
     }
-
     if (!isValidGameDate(dateParam)) {
       alert(
         `Invalid date: ${dateParam}. Please select a valid available date.`
@@ -58,10 +52,9 @@ export default function UnorderPage() {
     } else {
       setDateIsValid(true);
     }
-
-
   }, [dateParam, router]);
 
+  // Fetch game data
   useEffect(() => {
     if (!dateIsValid) return;
 
@@ -107,7 +100,6 @@ export default function UnorderPage() {
               savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
             );
             setGameOver(true);
-            setViewMode("guess");
             setLoading(false);
             return;
           }
@@ -123,7 +115,6 @@ export default function UnorderPage() {
           Array.isArray(parsed.items) && parsed.items.length > 0
             ? parsed.items
             : shuffle(game.inventions);
-
         const validGuesses = Array.isArray(parsed.guesses)
           ? parsed.guesses
           : [];
@@ -158,6 +149,7 @@ export default function UnorderPage() {
     }
   }, [loading]);
 
+  // Persist progress locally
   useEffect(() => {
     if (!gameOver && correctOrder.length > 0) {
       localStorage.setItem(
@@ -166,40 +158,6 @@ export default function UnorderPage() {
       );
     }
   }, [items, submittedGuesses, gameOver, correctOrder, progressKey]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { delay: 0, tolerance: 0 },
-    })
-  );
-
-  const onDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = items.indexOf(active.id);
-    const newIndex = items.indexOf(over.id);
-    const lastGuess = submittedGuesses.at(-1)?.guess || [];
-
-    const lockedIndexes = correctOrder.reduce((acc, id, idx) => {
-      if (lastGuess[idx]?.trim().toLowerCase() === id.trim().toLowerCase())
-        acc.push(idx);
-      return acc;
-    }, []);
-
-    const newItems = slotLockingStrategy(
-      items,
-      active.id,
-      over.id,
-      lockedIndexes
-    );
-    if (newItems === items) return;
-    setItems(newItems);
-
-    localStorage.setItem(
-      progressKey,
-      JSON.stringify({ items: newItems, guesses: submittedGuesses })
-    );
-  };
 
   const hudMessage = (msg) => {
     const hud = document.getElementById("hud");
@@ -240,8 +198,6 @@ export default function UnorderPage() {
     setSubmittedGuesses(newGuesses);
 
     const userId = getOrCreateAnonId();
-    // const supabase = createSupabaseClient(userId)
-
     const result = isCorrect
       ? "win"
       : newGuesses.length >= MAX_GUESSES
@@ -276,7 +232,6 @@ export default function UnorderPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-
         const data = await response.json();
 
         if (!response.ok || data.error) {
@@ -349,9 +304,16 @@ export default function UnorderPage() {
               <div className="w-full max-w-md mx-auto">
                 <GameBoard
                   items={boardItems}
-                  sensors={sensors}
-                  onDragEnd={onDragEnd}
-                  disableDrag={gameOver || revealInProgress || showCorrectView}
+                  onReorder={(newOrder) => {
+                    setItems(newOrder);
+                    localStorage.setItem(
+                      progressKey,
+                      JSON.stringify({
+                        items: newOrder,
+                        guesses: submittedGuesses,
+                      })
+                    );
+                  }}
                   gameOver={gameOver}
                   revealInProgress={revealInProgress}
                   revealStep={revealStep}
