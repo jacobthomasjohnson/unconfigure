@@ -1,15 +1,16 @@
+// app/components/GameBoard.js
 "use client";
 
 import React, { useState } from "react";
 import { Reorder } from "framer-motion";
-import SortableItem from "./SortableItem";
+import { Grip, Check } from "lucide-react";
 import { slotLockingStrategy } from "@/utils/slotLockingStrategy";
+import { EarliestDivider, LatestDivider } from "@/components/Dividers";
 
 export default function GameBoard({
   items,
   onReorder,
   gameOver,
-  revealInProgress,
   revealStep,
   showCorrectView,
   correctOrder,
@@ -21,29 +22,25 @@ export default function GameBoard({
   const normalize = (s) => s?.trim().toLowerCase() || "";
   const lastGuess = submittedGuesses.at(-1)?.guess || [];
 
-  // exactly the same logic as before to find locked slots
-  const lockedIndexes = items.reduce((acc, item, i) => {
+  // Which indices stay locked from your last correct guess
+  const lockedIndexes = items.reduce((acc, item, idx) => {
     const locked =
       !gameOver &&
       submittedGuesses.length > 0 &&
-      normalize(item) === normalize(correctOrder[i]) &&
-      normalize(item) === normalize(lastGuess[i]);
-    if (locked) acc.push(i);
+      normalize(item) === normalize(correctOrder[idx]) &&
+      normalize(item) === normalize(lastGuess[idx]);
+    if (locked) acc.push(idx);
     return acc;
   }, []);
 
-  // NEW: a redirecting handleReorder that never aborts silently
+  // Drag & drop with slot-locking
   const handleReorder = (newOrder) => {
     const oldIndex = items.indexOf(draggingItem);
     const newIndex = newOrder.indexOf(draggingItem);
-
-    // If they dropped onto an unlocked index, just use that
     let targetIndex = newIndex;
 
     if (lockedIndexes.includes(newIndex)) {
-      // dragDirection: down if newIndex > oldIndex, else up
       if (newIndex > oldIndex) {
-        // scan downward for next unlocked
         for (let i = newIndex + 1; i < items.length; i++) {
           if (!lockedIndexes.includes(i)) {
             targetIndex = i;
@@ -51,7 +48,6 @@ export default function GameBoard({
           }
         }
       } else {
-        // scan upward for previous unlocked
         for (let i = newIndex - 1; i >= 0; i--) {
           if (!lockedIndexes.includes(i)) {
             targetIndex = i;
@@ -59,7 +55,6 @@ export default function GameBoard({
           }
         }
       }
-      // if we never found an unlocked slot, bail
       if (lockedIndexes.includes(targetIndex)) {
         return;
       }
@@ -77,16 +72,10 @@ export default function GameBoard({
 
   return (
     <main
-      className="flex flex-col w-full max-w-md text-sm"
+      className="flex flex-col w-full max-w-md text-sm -mb-1 relative"
       style={{ touchAction: "manipulation" }}
     >
-      {/* Earliest */}
-      <div className="w-full gap-2 flex pb-[6px] items-center text-neutral-400">
-        Earliest
-        <div className="grow">
-          <div className="h-px bg-neutral-600" />
-        </div>
-      </div>
+      <EarliestDivider />
 
       <Reorder.Group
         axis="y"
@@ -98,6 +87,24 @@ export default function GameBoard({
         {items.map((item, idx) => {
           const isDragging = draggingItem === item;
           const isLocked = lockedIndexes.includes(idx);
+          const isRevealed = showCorrectView || (gameOver && revealStep >= idx);
+
+          // Determine each card’s status
+          const status = isRevealed
+            ? normalize(item) === normalize(correctOrder[idx])
+              ? "correct"
+              : "incorrect"
+            : "neutral";
+
+          // Map status → Tailwind classes
+          const statusClasses = {
+            neutral: "border-neutral-600 text-[#fcfcfc]",
+            correct: "border-[#93c5fd] text-[#cffafe]",
+            incorrect: "border-[#ff8fa3] text-[#fecdd3]",
+          }[status];
+
+          // When dragging, override border + text color
+          const dragClasses = "border-[#444] text-white";
 
           return (
             <Reorder.Item
@@ -105,51 +112,55 @@ export default function GameBoard({
               value={item}
               as="div"
               layout
-              drag="y"
+              drag={gameOver ? false : "y"}
               dragElastic={1}
               dragMomentum={false}
-              onDragStart={() => setDraggingItem(item)}
+              onDragStart={() => !gameOver && setDraggingItem(item)}
               onDragEnd={() => setDraggingItem(null)}
               animate={{
-                scale: isDragging ? 1.05 : 1,
-                backgroundColor: isDragging ? "#252525" : "#111",
+                backgroundColor: isDragging ? "#202020" : "#171717",
                 zIndex: isDragging ? 999 : 0,
               }}
               transition={{
-                layout: { type: "spring", stiffness: 600, damping: 40 },
-                backgroundColor: { duration: 0.15 },
+                layout: { type: "spring", stiffness: 800, damping: 40 },
+                backgroundColor: { duration: 0.1 },
               }}
-              style={{
-                marginBottom: "4px",
-                borderRadius: "2px",
-                position: "relative",
-              }}
+              className={`
+                relative overflow-hidden
+                border rounded-md m-1 p-3
+                ${isDragging ? dragClasses : statusClasses}
+              `}
             >
-              <SortableItem
-                id={item}
-                idx={idx}
-                correctOrder={correctOrder}
-                inventionDates={inventionDates}
-                gameOver={gameOver}
-                revealInProgress={revealInProgress}
-                revealStep={revealStep}
-                showCorrectView={showCorrectView}
-                submittedGuesses={submittedGuesses}
-                isLocked={isLocked}
-                isDragging={isDragging}
-              />
+              <div className="flex items-center justify-between w-full">
+                <span>{item}</span>
+
+                {isLocked && (
+                  <span className="text-xs text-green-400 ml-2">
+                    <Check width={14} height={14} />
+                  </span>
+                )}
+
+                {isRevealed && inventionDates[item] && (
+                  <span className="text-sm text-neutral-300">
+                    ({inventionDates[item]})
+                  </span>
+                )}
+
+                {!isRevealed && !isLocked && (
+                  <span className="text-[#444444]">
+                    <Grip width={12} height={12} />
+                  </span>
+                )}
+              </div>
             </Reorder.Item>
           );
         })}
       </Reorder.Group>
 
-      {/* Latest */}
-      <div className="w-full gap-2 flex pt-[6px] items-center text-neutral-400">
-        <div className="grow">
-          <div className="h-px bg-neutral-600" />
-        </div>
-        Latest
-      </div>
+      <div className="h-1" />
+      <LatestDivider />
+            <div className="h-1" />
+
     </main>
   );
 }

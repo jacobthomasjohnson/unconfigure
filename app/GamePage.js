@@ -1,3 +1,4 @@
+// app/app-pages/UnorderPage.js
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -37,102 +38,104 @@ export default function UnorderPage() {
   const [showContent, setShowContent] = useState(false);
   const [loadingScreenVisible, setLoadingScreenVisible] = useState(true);
   const hudTimeoutRef = useRef(null);
+  const [devToolsOpen, setDevToolsOpen] = useState(false);
 
-  // Validate date param on mount
+  const openDevTools = () => setDevToolsOpen((o) => !o);
+
+  // 1. Validate dateParam
   useEffect(() => {
     if (!dateParam) {
       setDateIsValid(true);
-      return;
-    }
-    if (!isValidGameDate(dateParam)) {
-      alert(
-        `Invalid date: ${dateParam}. Please select a valid available date.`
-      );
+    } else if (!isValidGameDate(dateParam)) {
+      alert(`Invalid date: ${dateParam}`);
       router.push("/");
     } else {
       setDateIsValid(true);
     }
   }, [dateParam, router]);
 
-  // Fetch game data
+  // 2. Fetch game + initialize state
   useEffect(() => {
     if (!dateIsValid) return;
 
-    const fetchGameData = async () => {
-      const userId = getOrCreateAnonId();
+    const fetchGame = async () => {
+      try {
+        const userId = getOrCreateAnonId();
+        const { data, error } = await supabase
+          .from("daily_games")
+          .select("*")
+          .eq("date", today);
 
-      const { data, error } = await supabase
-        .from("daily_games")
-        .select("*")
-        .eq("date", today);
-
-      if (error) {
-        console.error("Error fetching daily game:", error);
-        setLoading(false);
-        return;
-      }
-
-      const game = data?.[0];
-      if (!game) {
-        console.error("No game found for today");
-        setLoading(false);
-        return;
-      }
-
-      const cleanedDates = Object.fromEntries(
-        Object.entries(game.invention_dates).map(([k, v]) => [k.trim(), v])
-      );
-
-      setCorrectOrder(game.inventions);
-      setInventionDates(cleanedDates);
-
-      if (!replay) {
-        try {
-          const response = await fetch(
-            `/api/get-progress?user_id=${userId}&date=${today}`
-          );
-          const result = await response.json();
-
-          if (response.ok && result.data?.guesses?.length > 0) {
-            const savedGame = result.data;
-            setSubmittedGuesses(savedGame.guesses);
-            setItems(
-              savedGame.guesses.at(-1)?.guess || shuffle(game.inventions)
-            );
-            setGameOver(true);
-            setLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.warn("Failed to fetch saved progress:", err);
+        if (error) {
+          console.error("Supabase fetch error:", error);
+          setLoading(false);
+          return;
         }
+        if (!data || data.length === 0) {
+          console.error("No game row found for date:", today);
+          setLoading(false);
+          return;
+        }
+
+        const game = data[0];
+
+        // ─── Safely trim both keys and values ───
+        const cleaned = Object.fromEntries(
+          Object.entries(game.answers || {}).map(([k, v]) => [
+            String(k).trim(),
+            String(v).trim(),
+          ])
+        );
+
+        // sort the keys by numeric year
+        const sorted = Object.keys(cleaned).sort(
+          (a, b) => parseInt(cleaned[a], 10) - parseInt(cleaned[b], 10)
+        );
+
+        setCorrectOrder(sorted);
+        setInventionDates(cleaned);
+
+        // try server‐saved progress
+        if (!replay) {
+          try {
+            const res = await fetch(
+              `/api/get-progress?user_id=${userId}&date=${today}`
+            );
+            const body = await res.json();
+            if (res.ok && body.data?.guesses?.length) {
+              setSubmittedGuesses(body.data.guesses);
+              setItems(body.data.guesses.at(-1).guess || shuffle(sorted));
+              setGameOver(true);
+              setRevealStep(sorted.length - 1);
+              setLoading(false);
+              return;
+            }
+          } catch (fetchErr) {
+            console.warn("Error fetching server progress:", fetchErr);
+          }
+        }
+
+        // fallback to localStorage if present
+        const st = localStorage.getItem(progressKey);
+        if (st && !replay) {
+          const { items: oldItems, guesses: oldG } = JSON.parse(st);
+          setItems(Array.isArray(oldItems) ? oldItems : shuffle(sorted));
+          setSubmittedGuesses(Array.isArray(oldG) ? oldG : []);
+        } else {
+          setItems(shuffle(sorted));
+          setSubmittedGuesses([]);
+        }
+      } catch (topErr) {
+        console.error("Unexpected error in fetchGame:", topErr);
+      } finally {
+        setLoading(false);
       }
-
-      const progress = localStorage.getItem(progressKey);
-      if (progress && !replay) {
-        const parsed = JSON.parse(progress);
-        const validItems =
-          Array.isArray(parsed.items) && parsed.items.length > 0
-            ? parsed.items
-            : shuffle(game.inventions);
-        const validGuesses = Array.isArray(parsed.guesses)
-          ? parsed.guesses
-          : [];
-
-        setItems(validItems);
-        setSubmittedGuesses(validGuesses);
-      } else {
-        setItems(shuffle(game.inventions));
-        setSubmittedGuesses([]);
-      }
-
-      setLoading(false);
     };
 
-    fetchGameData();
-  }, [dateIsValid, today, replay]);
+    fetchGame();
+  }, [dateIsValid, today, replay, progressKey]);
 
-  // Handle loading splash screen
+  // 3. Loading splash logic
   useEffect(() => {
     if (!loading) {
       const seen = sessionStorage.getItem("seenLoadingScreen");
@@ -149,9 +152,13 @@ export default function UnorderPage() {
     }
   }, [loading]);
 
-  // Persist progress locally
+  // 4. Persist mid‐game progress
   useEffect(() => {
-    if (!gameOver && correctOrder.length > 0) {
+    if (
+      !gameOver &&
+      correctOrder.length > 0 &&
+      submittedGuesses.length > 0 // ← only after first guess
+    ) {
       localStorage.setItem(
         progressKey,
         JSON.stringify({ items, guesses: submittedGuesses })
@@ -159,14 +166,28 @@ export default function UnorderPage() {
     }
   }, [items, submittedGuesses, gameOver, correctOrder, progressKey]);
 
+  // 5. Staggered reveal
+  const revealResult = () => {
+    setRevealInProgress(true);
+    let step = 0;
+    const loop = () => {
+      if (step >= items.length) {
+        setRevealInProgress(false);
+        return;
+      }
+      setRevealStep(step++);
+      setTimeout(loop, 150);
+    };
+    loop();
+  };
+
   const hudMessage = (msg) => {
     const hud = document.getElementById("hud");
-    if (!hud) return;
-    if (hudTimeoutRef.current) clearTimeout(hudTimeoutRef.current);
-    hud.innerText = msg;
-    hudTimeoutRef.current = setTimeout(() => {
-      hudTimeoutRef.current = null;
-    }, 3000);
+    if (hud) {
+      clearTimeout(hudTimeoutRef.current);
+      hud.innerText = msg;
+      hudTimeoutRef.current = setTimeout(() => {}, 3000);
+    }
   };
 
   const triggerConfetti = () => {
@@ -174,8 +195,6 @@ export default function UnorderPage() {
       particleCount: 120,
       spread: 80,
       origin: { y: 1 },
-      startVelocity: 60,
-      gravity: 1,
       colors: [
         "#fbcfe8",
         "#a5f3fc",
@@ -189,10 +208,11 @@ export default function UnorderPage() {
     });
   };
 
+  // 6. Handle submit (win or lose both trigger the staggered reveal)
   const handleSubmit = async () => {
-    const normalize = (s) => s.trim().toLowerCase();
+    const norm = (s) => s.trim().toLowerCase();
     const isCorrect = items.every(
-      (item, i) => normalize(item) === normalize(correctOrder[i])
+      (item, i) => norm(item) === norm(correctOrder[i])
     );
     const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }];
     setSubmittedGuesses(newGuesses);
@@ -204,19 +224,19 @@ export default function UnorderPage() {
       ? "lose"
       : "in_progress";
 
-    if (isCorrect) {
-      triggerConfetti();
-      setGameOver(true);
-      hudMessage("Correct! Well done.");
-    }
-
-    if (result === "lose") {
-      setGameOver(true);
-      hudMessage("Incorrect. Better luck next time!");
-      revealResult();
-    }
-
     if (result !== "in_progress") {
+      setGameOver(true);
+
+      if (isCorrect) {
+        triggerConfetti();
+        hudMessage("🎉 Nicely done!");
+      } else {
+        hudMessage("😞 Better luck next time!");
+      }
+
+      revealResult();
+
+      // save to server
       const payload = {
         user_id: userId,
         date: today,
@@ -225,53 +245,60 @@ export default function UnorderPage() {
         invention_dates: inventionDates,
         result,
       };
-
       try {
-        const response = await fetch("/api/save-progress", {
+        const res = await fetch("/api/save-progress", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          console.error("❌ Failed to save result to server:", data.error);
-          hudMessage("❌ Failed to save result to server.");
-        } else {
-          console.log("✅ Game progress saved via API");
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          console.error("Failed to save:", data.error);
+          hudMessage("❌ Could not save.");
         }
       } catch (err) {
-        console.error("❌ Network error while saving progress:", err);
-        hudMessage("❌ Could not connect to server.");
+        console.error("Network error saving progress:", err);
+        hudMessage("❌ Network error.");
       }
 
       localStorage.removeItem(progressKey);
-      return;
+    } else {
+      hudMessage("Incorrect! Try again.");
+      setFlash(true);
+      setTimeout(() => setFlash(false), 200);
     }
-
-    hudMessage("Incorrect! Try again.");
-    setFlash(true);
-    setTimeout(() => setFlash(false), 200);
   };
 
-  const revealResult = () => {
-    setRevealInProgress(true);
-    let step = 0;
-    const loop = () => {
-      if (step >= items.length) return setRevealInProgress(false);
-      setRevealStep(step++);
-      setTimeout(loop, 250);
-    };
-    loop();
-  };
-
-  const reset = () => {
+  // 7. Full reset (local only)
+  const resetLocal = () => {
+    localStorage.removeItem(progressKey);
     setItems(shuffle(correctOrder));
     setSubmittedGuesses([]);
     setGameOver(false);
     setRevealInProgress(false);
     setRevealStep(-1);
     setViewMode("guess");
+    setFlash(false);
+    // Refresh the page to clear any lingering state
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
+
+  // 8. Dev‐mode: clear server + local, then reset
+  const handleClearResults = async () => {
+    const userId = getOrCreateAnonId();
+    const res = await fetch("/api/delete-progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!res.ok) {
+      console.error("❌ Failed to delete server progress");
+      hudMessage("❌ Could not clear server history");
+    } else {
+      resetLocal();
+    }
   };
 
   const lastGuess = submittedGuesses.at(-1)?.guess || [];
@@ -282,7 +309,7 @@ export default function UnorderPage() {
   return (
     <>
       <div
-        className={`fixed top-0 left-0 h-full w-full flex items-center justify-center z-50 bg-neutral-900 text-neutral-300 transition-opacity duration-700 ${
+        className={`fixed inset-0 flex items-center justify-center bg-black text-neutral-300 transition-opacity ${
           loadingScreenVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -290,12 +317,14 @@ export default function UnorderPage() {
       </div>
 
       {showContent && (
-        <div className="min-h-full flex flex-col transition-colors">
+        <div className="min-h-full flex flex-col">
           <Header currentDate={today} />
+
           <div
             id="hud"
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 bg-[#222222] border-[#333333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg whitespace-nowrap w-auto max-w-[90vw]"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-neutral-200 border-[#333] rounded-md z-10 p-4 opacity-0 transition-opacity text-lg"
           />
+
           <div className="grow">
             <motion.div
               animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
@@ -325,20 +354,32 @@ export default function UnorderPage() {
               </div>
             </motion.div>
 
-            {gameOver && (
-              <div className="max-w-md mt-2 mx-auto text-center font-light animate-bounce">
-                {submittedGuesses.at(-1)?.isCorrect
-                  ? "🎉 Nicely done!"
-                  : "😞 Better luck next time!"}
+            {devMode && (
+              <div className="fixed bottom-4 right-4 z-50">
+                <button
+                  onClick={openDevTools}
+                  className="bg-neutral-900 hover:bg-neutral-700 text-white px-3 py-2 rounded-md"
+                >
+                  Dev Tools
+                </button>
+                {devToolsOpen && (
+                  <div className="mt-2 p-4 bg-neutral-800 border border-neutral-600 rounded-md text-sm text-neutral-200 flex flex-col gap-2">
+                    <button
+                      onClick={triggerConfetti}
+                      className="w-full bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded"
+                    >
+                      🎉 Confetti
+                    </button>
+                    <button
+                      onClick={handleClearResults}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded"
+                    >
+                      🗑️ Clear All Progress
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-
-            <button
-              className={`p-4 border rounded ${devMode ? "visible" : "hidden"}`}
-              onClick={triggerConfetti}
-            >
-              Simulate Correct Response
-            </button>
           </div>
 
           <Footer
@@ -346,7 +387,7 @@ export default function UnorderPage() {
             gameOver={gameOver}
             guessesLeft={guessesLeft}
             handleSubmit={handleSubmit}
-            reset={reset}
+            reset={resetLocal}
             viewMode={viewMode}
             setViewMode={setViewMode}
             correctOrder={correctOrder}
