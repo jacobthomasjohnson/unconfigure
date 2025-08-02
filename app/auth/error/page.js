@@ -3,22 +3,13 @@
 import { useSearchParams } from "next/navigation";
 
 export default function AuthErrorPage() {
-  const params = useSearchParams();
-  const reason = params.get("reason");
-
-  const message =
-    {
-      missing_code: "OAuth code missing. Please try logging in again.",
-      exchange_failed: "Login failed during session exchange.",
-      server_crash: "Unexpected server error during login.",
-    }[reason] ?? "An unknown error occurred.";
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error") ?? "Unknown error";
 
   return (
-    <div className="flex items-center justify-center min-h-screen text-center p-8">
-      <div>
-        <h1 className="text-2xl font-semibold mb-4">Authentication Error</h1>
-        <p className="text-gray-400">{message}</p>
-      </div>
+    <div className="p-8">
+      <h1 className="text-2xl font-bold">Authentication Error</h1>
+      <p className="mt-4 text-red-500">{error}</p>
     </div>
   );
 }
