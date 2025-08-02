@@ -3,8 +3,8 @@
 import { useSearchParams } from "next/navigation";
 
 export default function AuthErrorPage() {
-  const searchParams = useSearchParams();
-  const error = searchParams.get("error") ?? "Unknown error";
+  const params = useSearchParams();
+  const error = params.get("error") ?? "Unknown error";
 
   return (
     <div className="p-8">
