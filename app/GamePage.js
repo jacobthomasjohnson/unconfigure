@@ -13,6 +13,7 @@ import confetti from "canvas-confetti";
 import useStore from "./store/store";
 import { getOrCreateAnonId } from "@/utils/userId";
 import { supabase } from "@/lib/supabaseClient";
+import generateEmojiResult from "@/utils/generateEmoji";
 
 export default function UnorderPage() {
   const router = useRouter();
@@ -42,6 +43,51 @@ export default function UnorderPage() {
 
   const openDevTools = () => setDevToolsOpen((o) => !o);
 
+  const [userId, setUserId] = useState(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    const getSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
+
+      const anonId = getOrCreateAnonId();
+
+      if (session?.user?.id) {
+        setIsSignedIn(true);
+        setUserId(session.user.id);
+        setUserEmail(session.user.email);
+
+        const anonProgress = localStorage.getItem(`progress-${today}`);
+        if (anonProgress) {
+          try {
+            const payload = {
+              user_id: session.user.id,
+              date: today,
+              ...JSON.parse(anonProgress),
+              result: "migrated_anon",
+            };
+            await fetch("/api/save-progress", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            localStorage.removeItem(`progress-${today}`);
+          } catch (err) {
+            console.warn("❌ Error migrating anon progress to user:", err);
+          }
+        }
+      } else {
+        setIsSignedIn(false);
+        setUserId(anonId);
+        setUserEmail(null);
+      }
+    };
+
+    getSession();
+  }, []);
+
   // 1. Validate dateParam
   useEffect(() => {
     if (!dateParam) {
@@ -54,13 +100,15 @@ export default function UnorderPage() {
     }
   }, [dateParam, router]);
 
-  // 2. Fetch game + initialize state
   useEffect(() => {
-    if (!dateIsValid) return;
+
+    if (!dateIsValid || userId === null) {
+      return; // Don't fetch unless session is fully set
+    }
 
     const fetchGame = async () => {
       try {
-        const userId = getOrCreateAnonId();
+        // 1. Fetch the game data
         const { data, error } = await supabase
           .from("daily_games")
           .select("*")
@@ -71,6 +119,7 @@ export default function UnorderPage() {
           setLoading(false);
           return;
         }
+
         if (!data || data.length === 0) {
           console.error("No game row found for date:", today);
           setLoading(false);
@@ -95,19 +144,42 @@ export default function UnorderPage() {
         setCorrectOrder(sorted);
         setInventionDates(cleaned);
 
-        // try server‐saved progress
+        // 2. Try fetching server-saved progress
         if (!replay) {
           try {
             const res = await fetch(
               `/api/get-progress?user_id=${userId}&date=${today}`
             );
             const body = await res.json();
-            if (res.ok && body.data?.guesses?.length) {
-              setSubmittedGuesses(body.data.guesses);
-              setItems(body.data.guesses.at(-1).guess || shuffle(sorted));
+            const progress = body.data;
+
+            if (
+              res.ok &&
+              progress?.result &&
+              progress?.emoji_results?.length &&
+              progress?.final_guess
+            ) {
+
+              // Parse final_guess string back into an array
+              const finalGuess = JSON.parse(progress.final_guess); // Parse the stringified array
+
+              const isWin = progress.result === "win";
+              const isLoss = progress.result === "lose";
+
+              const guesses = Array.from(
+                { length: progress.attempts },
+                (_, i) => ({
+                  guess: [...finalGuess],
+                  isCorrect: isWin && i === progress.attempts - 1,
+                })
+              );
+
+              setSubmittedGuesses(guesses);
+              setItems([...finalGuess]); // Use parsed finalGuess here
               setGameOver(true);
-              setRevealStep(sorted.length - 1);
+              setRevealStep(sorted.length - 1); // Update reveal step based on sorted length
               setLoading(false);
+
               return;
             }
           } catch (fetchErr) {
@@ -115,7 +187,7 @@ export default function UnorderPage() {
           }
         }
 
-        // fallback to localStorage if present
+        // 3. Fallback to localStorage if no server progress is found
         const st = localStorage.getItem(progressKey);
         if (st && !replay) {
           const { items: oldItems, guesses: oldG } = JSON.parse(st);
@@ -132,8 +204,14 @@ export default function UnorderPage() {
       }
     };
 
-    fetchGame();
-  }, [dateIsValid, today, replay, progressKey]);
+    // Fetch the game once both `dateIsValid` and `userId` are valid
+    if (userId && dateIsValid) {
+      setLoading(true);
+      fetchGame()
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [dateIsValid, today, replay, userId]); // Removed unnecessary dependencies (like `correctOrder`)
 
   // 3. Loading splash logic
   useEffect(() => {
@@ -208,16 +286,19 @@ export default function UnorderPage() {
     });
   };
 
-  // 6. Handle submit (win or lose both trigger the staggered reveal)
   const handleSubmit = async () => {
     const norm = (s) => s.trim().toLowerCase();
     const isCorrect = items.every(
       (item, i) => norm(item) === norm(correctOrder[i])
     );
+
     const newGuesses = [...submittedGuesses, { guess: [...items], isCorrect }];
     setSubmittedGuesses(newGuesses);
 
-    const userId = getOrCreateAnonId();
+    const emojiResults = newGuesses.map((g) =>
+      generateEmojiResult(g.guess, correctOrder)
+    );
+
     const result = isCorrect
       ? "win"
       : newGuesses.length >= MAX_GUESSES
@@ -236,31 +317,34 @@ export default function UnorderPage() {
 
       revealResult();
 
-      // save to server
       const payload = {
         user_id: userId,
         date: today,
-        guesses: newGuesses,
-        correct_order: correctOrder,
-        invention_dates: inventionDates,
         result,
+        attempts: newGuesses.length,
+        emoji_results: emojiResults,
+        final_guess: [...items],
       };
-      try {
-        const res = await fetch("/api/save-progress", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (!res.ok || data.error) {
-          console.error("Failed to save:", data.error);
-          hudMessage("❌ Could not save.");
+
+      if (isSignedIn) {
+        try {
+          const res = await fetch("/api/save-progress", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            console.error("Failed to save:", data.error);
+            hudMessage("❌ Could not save.");
+          }
+        } catch (err) {
+          console.error("Network error saving progress:", err);
+          hudMessage("❌ Network error.");
         }
-      } catch (err) {
-        console.error("Network error saving progress:", err);
-        hudMessage("❌ Network error.");
       }
 
+      // Clear localStorage for both anonymous and signed-in players
       localStorage.removeItem(progressKey);
     } else {
       hudMessage("Incorrect! Try again.");
@@ -287,7 +371,7 @@ export default function UnorderPage() {
 
   // 8. Dev‐mode: clear server + local, then reset
   const handleClearResults = async () => {
-    const userId = getOrCreateAnonId();
+    if (!userId) return;
     const res = await fetch("/api/delete-progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -299,6 +383,25 @@ export default function UnorderPage() {
     } else {
       resetLocal();
     }
+  };
+
+  const signInWithGoogle = () => {
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+      queryParams: {
+        response_type: "code",
+      },
+    });
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsSignedIn(false);
+    setUserId(getOrCreateAnonId());
+    setUserEmail(null);
+    window.location.reload(); // optional but good for forcing full state reset
   };
 
   const lastGuess = submittedGuesses.at(-1)?.guess || [];
@@ -319,6 +422,15 @@ export default function UnorderPage() {
       {showContent && (
         <div className="min-h-full flex flex-col">
           <Header currentDate={today} />
+
+          {!isSignedIn && (
+            <button
+              className="p-3 w-full max-w-md mx-auto text-sm text-neutral-500 hover:text-neutral-400 my-2 border border-neutral-700 rounded-md"
+              onClick={signInWithGoogle}
+            >
+              Sign in with Google
+            </button>
+          )}
 
           <div
             id="hud"
@@ -398,6 +510,21 @@ export default function UnorderPage() {
             }
             lastGuess={lastGuess}
           />
+
+          <p className="text-xs text-neutral-600 text-center mt-2 uppercase select-none">
+            {isSignedIn && userEmail
+              ? `Signed in as ${userEmail}`
+              : "Anonymous player"}
+          </p>
+
+          {isSignedIn && (
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-neutral-500 hover:text-neutral-400 underline mx-auto my-2"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       )}
     </>

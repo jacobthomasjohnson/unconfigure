@@ -159,8 +159,7 @@ export default function GameBoard({
 
       <div className="h-1" />
       <LatestDivider />
-            <div className="h-1" />
-
+      <div className="h-1" />
     </main>
   );
 }

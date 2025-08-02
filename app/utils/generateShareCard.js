@@ -1,19 +1,19 @@
-import { MAX_GUESSES } from './constants'
+import { MAX_GUESSES } from "./constants";
 
-export default function generateShareCard (allGuesses, correctOrder) {
-  const normalize = str => str.trim().toLowerCase()
+export default function generateShareCard(allGuesses, correctOrder) {
+  const normalize = (str) => (str ? str.trim().toLowerCase() : "");
 
-  const header = `My https://unconfigure.com/ Results from Today!`
+  const header = `My https://unconfigure.com/ Results from Today!`;
 
   const lines = allGuesses.map(({ guess }, idx) => {
     const emojis = guess
       .map((val, i) =>
-        normalize(val) === normalize(correctOrder[i]) ? '🟩' : '🟥'
+        normalize(val) === normalize(correctOrder[i]) ? "🟩" : "🟥"
       )
-      .join('')
+      .join("");
 
-    return `${idx + 1}/${MAX_GUESSES}: ${emojis}`
-  })
+    return `${idx + 1}/${MAX_GUESSES}: ${emojis}`;
+  });
 
-  return [header, ...lines].join('\n')
+  return [header, ...lines].join("\n");
 }
