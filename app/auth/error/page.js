@@ -1,17 +1,15 @@
-"use client";
-
 export const dynamic = "force-dynamic";
 
-import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import ClientErrorMessage from "./ClientErrorMessage";
 
 export default function AuthErrorPage() {
-  const params = useSearchParams();
-  const error = params.get("error") ?? "Unknown error";
-
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold">Authentication Error</h1>
-      <p className="mt-4 text-red-500">{error}</p>
+      <Suspense fallback={<p className="mt-4 text-neutral-500">Loading…</p>}>
+        <ClientErrorMessage />
+      </Suspense>
     </div>
   );
 }
