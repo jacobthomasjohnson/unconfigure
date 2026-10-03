@@ -1,41 +1,71 @@
-import { createClient } from "@supabase/supabase-js";
+import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
+import {
+  choosePreferredProgress,
+  normalizeProgress,
+  toProgressRow,
+  validateProgressInput,
+} from "@/lib/progress";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export async function POST(request) {
+  const auth = await requireAuthenticatedUser();
+  if (auth.response) return auth.response;
 
-export async function POST(req) {
-  const { user_id, date, result, attempts, emoji_results, final_guess } =
-    await req.json();
-
-  if (!user_id || !date || final_guess === undefined) {
-    return new Response(JSON.stringify({ error: "Missing required fields" }), {
-      status: 400,
-    });
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  console.log("[API] Saving progress for user:", user_id, "date:", date);
-
-  // Insert or update the user's game progress in the database
-  const { data, error } = await supabase.from("game_progress").upsert(
-    {
-      user_id,
-      date,
-      result,
-      attempts,
-      emoji_results,
-      final_guess, // Ensure final_guess is properly included in the insert/update
-    },
-    { onConflict: ["user_id", "date"] } // Update if user_id and date match
-  );
-
-  if (error) {
-    console.error("[API] Error saving progress:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-    });
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "Invalid progress body." }, { status: 400 });
   }
 
-  return new Response(JSON.stringify({ data }), { status: 200 });
+  if (Object.hasOwn(body, "user_id")) {
+    return Response.json(
+      { error: "user_id is derived from the authenticated session." },
+      { status: 400 }
+    );
+  }
+
+  const validation = validateProgressInput(body);
+  if (validation.error) {
+    return Response.json({ error: validation.error }, { status: 400 });
+  }
+
+  const { supabase, user } = auth;
+  const { data: existingRow, error: readError } = await supabase
+    .from("game_progress")
+    .select(
+      "date, result, attempts, guesses, emoji_results, final_guess, updated_at"
+    )
+    .eq("user_id", user.id)
+    .eq("date", validation.progress.date)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("[progress] Failed to read existing progress", {
+      userId: user.id,
+      date: validation.progress.date,
+      error: readError.message,
+    });
+    return Response.json({ error: "Could not read progress." }, { status: 500 });
+  }
+
+  const existing = normalizeProgress(existingRow);
+  const progress = choosePreferredProgress(existing, validation.progress);
+  const { error: writeError } = await supabase
+    .from("game_progress")
+    .upsert(toProgressRow(user.id, progress), { onConflict: "user_id,date" });
+
+  if (writeError) {
+    console.error("[progress] Failed to save progress", {
+      userId: user.id,
+      date: progress.date,
+      error: writeError.message,
+    });
+    return Response.json({ error: "Could not save progress." }, { status: 500 });
+  }
+
+  return Response.json({ data: progress });
 }

@@ -1,38 +1,47 @@
-import { createClient } from "@supabase/supabase-js";
+import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
+import { isCalendarDate } from "@/lib/progress";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export async function POST(request) {
+  const auth = await requireAuthenticatedUser();
+  if (auth.response) return auth.response;
 
-export async function POST(req) {
-  const body = await req.json();
-  const { user_id, date } = body;
-
-  if (!user_id || !date) {
-    return new Response(JSON.stringify({ error: "Missing user_id or date" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { data, error } = await supabase
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (Object.hasOwn(body, "user_id")) {
+    return Response.json(
+      { error: "user_id is derived from the authenticated session." },
+      { status: 400 }
+    );
+  }
+
+  if (!isCalendarDate(body.date)) {
+    return Response.json({ error: "A valid date is required." }, { status: 400 });
+  }
+
+  const { data, error } = await auth.supabase
     .from("game_progress")
     .select("date")
-    .eq("user_id", user_id)
-    .eq("date", date)
+    .eq("user_id", auth.user.id)
+    .eq("date", body.date)
     .limit(1);
 
   if (error) {
-    console.error("Supabase error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
+    console.error("[progress] Failed to check history", {
+      userId: auth.user.id,
+      date: body.date,
+      error: error.message,
     });
+    return Response.json({ error: "Could not check history." }, { status: 500 });
   }
 
-  return new Response(JSON.stringify({ exists: data.length > 0 }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json({ exists: data.length > 0 });
 }
