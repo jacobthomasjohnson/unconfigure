@@ -17,3 +17,11 @@ Back up the database before applying the migration. Afterward, inspect the
 quarantine table before deciding whether its legacy anonymous records should
 be retained or permanently removed. The quarantine table is not accessible to
 anonymous or authenticated application clients.
+
+`202610030002_secure_daily_games.sql` makes daily-game dates unique, revokes
+direct public reads of `daily_games`, and exposes a narrow `get_daily_game`
+function. The function returns only games dated on or before the current date
+in `America/Chicago`, preventing public clients from downloading future
+answers. For a no-downtime rollout, deploy the application route first, then
+apply this migration; the route has a temporary fallback for the pre-migration
+schema.

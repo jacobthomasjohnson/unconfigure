@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { getSafePostAuthRedirect } from "@/lib/authRedirect";
 
 export async function GET(request) {
   try {
     const url = new URL(request.url);
     const code = url.searchParams.get("code");
-    const next = url.searchParams.get("next") ?? "/";
+    const redirectUrl = getSafePostAuthRedirect(
+      url.origin,
+      url.searchParams.get("next")
+    );
 
     if (!code) {
       console.error("Missing code in callback");
@@ -24,7 +28,7 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.redirect(`${url.origin}${next}`);
+    return NextResponse.redirect(redirectUrl);
   } catch (err) {
     console.error("Unhandled error in callback:", err);
     const url = new URL(request.url);

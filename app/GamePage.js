@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { shuffle, isValidGameDate } from "@/utils/utils";
+import { useSearchParams } from "next/navigation";
+import { shuffle } from "@/utils/utils";
 import { MAX_GUESSES } from "@/utils/constants";
 import Header from "@/components/Header";
 import GameBoard from "@/components/GameBoard";
@@ -14,9 +14,11 @@ import useStore from "./store/store";
 import { supabase } from "@/lib/supabaseClient";
 import generateEmojiResult from "@/utils/generateEmoji";
 import { usePlayerIdentity } from "@/hooks/usePlayerIdentity";
+import { getCurrentGameDate } from "@/lib/dailyGame";
 import {
   choosePreferredProgress,
   createProgress,
+  isCalendarDate,
   isCompletedProgress,
 } from "@/lib/progress";
 import {
@@ -30,12 +32,11 @@ import {
 } from "@/lib/progressStorage";
 
 export default function UnorderPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const dateParam = searchParams.get("date");
   const replay = searchParams.get("replay") === "true";
 
-  const today = dateParam || new Date().toLocaleDateString("en-CA");
+  const today = dateParam || getCurrentGameDate();
   const devMode = useStore((state) => state.devMode);
   const identity = usePlayerIdentity();
   const isSignedIn = identity.status === "authenticated";
@@ -59,6 +60,7 @@ export default function UnorderPage() {
   const [loading, setLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [loadingScreenVisible, setLoadingScreenVisible] = useState(true);
+  const [gameStatus, setGameStatus] = useState("loading");
   const hudTimeoutRef = useRef(null);
   const [devToolsOpen, setDevToolsOpen] = useState(false);
 
@@ -66,17 +68,16 @@ export default function UnorderPage() {
 
   const userEmail = identity.user?.email ?? null;
 
-  // 1. Validate dateParam
+  // 1. Validate the URL shape before requesting the game.
   useEffect(() => {
-    if (!dateParam) {
+    if (!dateParam || isCalendarDate(dateParam)) {
       setDateIsValid(true);
-    } else if (!isValidGameDate(dateParam)) {
-      alert(`Invalid date: ${dateParam}`);
-      router.push("/");
     } else {
-      setDateIsValid(true);
+      setDateIsValid(false);
+      setGameStatus("invalid");
+      setLoading(false);
     }
-  }, [dateParam, router]);
+  }, [dateParam]);
 
   useEffect(() => {
     const identityReady =
@@ -85,41 +86,34 @@ export default function UnorderPage() {
 
     const fetchGame = async () => {
       try {
-        // 1. Fetch the game data
-        const { data, error } = await supabase
-          .from("daily_games")
-          .select("*")
-          .eq("date", today);
+        setGameStatus("loading");
+        const gameResponse = await fetch(
+          `/api/daily-game/?date=${encodeURIComponent(today)}`,
+          { cache: "no-store" }
+        );
+        const gameBody = await gameResponse.json();
 
-        if (error) {
-          console.error("Supabase fetch error:", error);
-          setLoading(false);
+        if (!gameResponse.ok) {
+          if (gameResponse.status === 404) {
+            setGameStatus("unavailable");
+          } else {
+            console.error("Could not load daily game", {
+              date: today,
+              code: gameBody.code,
+            });
+            setGameStatus("error");
+          }
           return;
         }
 
-        if (!data || data.length === 0) {
-          console.error("No game row found for date:", today);
-          setLoading(false);
-          return;
-        }
+        const game = gameBody.data;
 
-        const game = data[0];
-
-        // ─── Safely trim both keys and values ───
-        const cleaned = Object.fromEntries(
-          Object.entries(game.answers || {}).map(([k, v]) => [
-            String(k).trim(),
-            String(v).trim(),
-          ])
-        );
-
-        // sort the keys by numeric year
-        const sorted = Object.keys(cleaned).sort(
-          (a, b) => parseInt(cleaned[a], 10) - parseInt(cleaned[b], 10)
-        );
+        const cleaned = game.itemDates;
+        const sorted = game.items;
 
         setCorrectOrder(sorted);
         setInventionDates(cleaned);
+        setGameStatus("available");
 
         if (replay) {
           setItems(shuffle(sorted));
@@ -197,6 +191,7 @@ export default function UnorderPage() {
         setSubmittedGuesses([]);
       } catch (topErr) {
         console.error("Unexpected error in fetchGame:", topErr);
+        setGameStatus("error");
       } finally {
         setLoading(false);
       }
@@ -419,7 +414,8 @@ export default function UnorderPage() {
   };
 
   const signInWithGoogle = () => {
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    const next = `${window.location.pathname}${window.location.search}`;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
     supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },
@@ -474,44 +470,64 @@ export default function UnorderPage() {
           />
 
           <div className="grow">
-            <motion.div
-              animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
-              transition={{ duration: 0.15 }}
-            >
-              <div className="w-full max-w-md mx-auto">
-                <GameBoard
-                  items={boardItems}
-                  onReorder={(newOrder) => {
-                    setItems(newOrder);
-                    if (!replay && progressKey) {
-                      const latestGuess = submittedGuesses.at(-1);
-                      const result = latestGuess?.isCorrect
-                        ? "win"
-                        : gameOver
-                          ? "lose"
-                          : "in_progress";
-                      const progress = createProgress({
-                        date: today,
-                        items: newOrder,
-                        guesses: submittedGuesses,
-                        emojiResults: submittedGuesses.map((guess) =>
-                          generateEmojiResult(guess.guess, correctOrder)
-                        ),
-                        result,
-                      });
-                      writeStoredProgress(localStorage, progressKey, progress);
-                    }
-                  }}
-                  gameOver={gameOver}
-                  revealInProgress={revealInProgress}
-                  revealStep={revealStep}
-                  showCorrectView={showCorrectView}
-                  correctOrder={correctOrder}
-                  inventionDates={inventionDates}
-                  submittedGuesses={submittedGuesses}
-                />
-              </div>
-            </motion.div>
+            {gameStatus === "invalid" && (
+              <p className="w-full max-w-md mx-auto p-4 text-center text-red-300">
+                That game date is invalid.
+              </p>
+            )}
+
+            {gameStatus === "unavailable" && (
+              <p className="w-full max-w-md mx-auto p-4 text-center text-neutral-400">
+                There is no available game for this date.
+              </p>
+            )}
+
+            {gameStatus === "error" && (
+              <p className="w-full max-w-md mx-auto p-4 text-center text-red-300">
+                The game could not be loaded. Please try again.
+              </p>
+            )}
+
+            {gameStatus === "available" && (
+              <motion.div
+                animate={flash ? { x: [0, -8, 8, -8, 0] } : {}}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="w-full max-w-md mx-auto">
+                  <GameBoard
+                    items={boardItems}
+                    onReorder={(newOrder) => {
+                      setItems(newOrder);
+                      if (!replay && progressKey) {
+                        const latestGuess = submittedGuesses.at(-1);
+                        const result = latestGuess?.isCorrect
+                          ? "win"
+                          : gameOver
+                            ? "lose"
+                            : "in_progress";
+                        const progress = createProgress({
+                          date: today,
+                          items: newOrder,
+                          guesses: submittedGuesses,
+                          emojiResults: submittedGuesses.map((guess) =>
+                            generateEmojiResult(guess.guess, correctOrder)
+                          ),
+                          result,
+                        });
+                        writeStoredProgress(localStorage, progressKey, progress);
+                      }
+                    }}
+                    gameOver={gameOver}
+                    revealInProgress={revealInProgress}
+                    revealStep={revealStep}
+                    showCorrectView={showCorrectView}
+                    correctOrder={correctOrder}
+                    inventionDates={inventionDates}
+                    submittedGuesses={submittedGuesses}
+                  />
+                </div>
+              </motion.div>
+            )}
 
             {devMode && (
               <div className="fixed bottom-4 right-4 z-50">
@@ -541,22 +557,24 @@ export default function UnorderPage() {
             )}
           </div>
 
-          <Footer
-            submittedGuesses={submittedGuesses}
-            gameOver={gameOver}
-            guessesLeft={guessesLeft}
-            handleSubmit={handleSubmit}
-            reset={resetLocal}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            correctOrder={correctOrder}
-            showToggle={
-              gameOver &&
-              lastGuess &&
-              !lastGuess.every((v, i) => v === correctOrder[i])
-            }
-            lastGuess={lastGuess}
-          />
+          {gameStatus === "available" && (
+            <Footer
+              submittedGuesses={submittedGuesses}
+              gameOver={gameOver}
+              guessesLeft={guessesLeft}
+              handleSubmit={handleSubmit}
+              reset={resetLocal}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              correctOrder={correctOrder}
+              showToggle={
+                gameOver &&
+                lastGuess &&
+                !lastGuess.every((v, i) => v === correctOrder[i])
+              }
+              lastGuess={lastGuess}
+            />
+          )}
 
           <p className="text-xs text-neutral-600 text-center mt-2 uppercase select-none">
             {isSignedIn && userEmail
