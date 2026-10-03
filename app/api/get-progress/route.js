@@ -1,46 +1,34 @@
-import { createClient } from "@supabase/supabase-js";
+export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
+import { isCalendarDate, normalizeProgress } from "@/lib/progress";
 
-export async function GET(req) {
-  const { searchParams } = new URL(req.url);
-  const user_id = searchParams.get("user_id");
-  const date = searchParams.get("date");
-
-  if (!user_id || !date || user_id === "undefined" || date === "undefined") {
-    return new Response(
-      JSON.stringify({ error: "Missing or invalid user_id/date" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+export async function GET(request) {
+  const date = new URL(request.url).searchParams.get("date");
+  if (!isCalendarDate(date)) {
+    return Response.json({ error: "A valid date is required." }, { status: 400 });
   }
 
-  console.log("[API] Fetching progress for user:", user_id, "date:", date); // Log user_id and date
+  const auth = await requireAuthenticatedUser();
+  if (auth.response) return auth.response;
 
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from("game_progress")
-    .select("result, attempts, emoji_results, final_guess")
-    .eq("user_id", user_id)
+    .select(
+      "date, result, attempts, guesses, emoji_results, final_guess, updated_at"
+    )
+    .eq("user_id", auth.user.id)
     .eq("date", date)
-    .maybeSingle(); // Fetch single row
+    .maybeSingle();
 
   if (error) {
-    console.error("[API] Supabase error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
+    console.error("[progress] Failed to fetch progress", {
+      userId: auth.user.id,
+      date,
+      error: error.message,
     });
+    return Response.json({ error: "Could not fetch progress." }, { status: 500 });
   }
 
-  console.log("[API] Progress data:", data); // Log the fetched progress data
-
-  return new Response(JSON.stringify({ data }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json({ data: normalizeProgress(data) });
 }

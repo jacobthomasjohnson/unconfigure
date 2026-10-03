@@ -1,41 +1,57 @@
 export const dynamic = "force-dynamic";
 
-import { createClient } from "@supabase/supabase-js";
+import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
+import { isCalendarDate } from "@/lib/progress";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export async function DELETE(request) {
+  const auth = await requireAuthenticatedUser();
+  if (auth.response) return auth.response;
 
-export async function POST(req) {
-  const body = await req.json();
-  const { user_id, date } = body;
-
-  if (!user_id || user_id === "null" || user_id === "undefined") {
-    return new Response(JSON.stringify({ error: "Missing user_id" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+  const date = new URL(request.url).searchParams.get("date");
+  if (date !== null && !isCalendarDate(date)) {
+    return Response.json({ error: "Invalid date." }, { status: 400 });
   }
 
-  let query = supabase.from("game_progress").delete().eq("user_id", user_id);
+  let query = auth.supabase
+    .from("game_progress")
+    .delete()
+    .eq("user_id", auth.user.id);
 
-  if (date) {
-    query = query.eq("date", date);
-  }
+  if (date) query = query.eq("date", date);
 
   const { error } = await query;
-
   if (error) {
-    console.error("[Supabase] Delete error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
+    console.error("[progress] Failed to delete progress", {
+      userId: auth.user.id,
+      date,
+      error: error.message,
     });
+    return Response.json({ error: "Could not delete progress." }, { status: 500 });
   }
 
-  return new Response(JSON.stringify({ success: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json({ success: true });
+}
+
+export async function POST(request) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (Object.hasOwn(body, "user_id")) {
+    return Response.json(
+      { error: "user_id is derived from the authenticated session." },
+      { status: 400 }
+    );
+  }
+
+  const url = new URL(request.url);
+  if (body.date) url.searchParams.set("date", body.date);
+  return DELETE(new Request(url, { method: "DELETE", headers: request.headers }));
 }
