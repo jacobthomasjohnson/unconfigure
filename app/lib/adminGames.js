@@ -1,4 +1,5 @@
 import { isCalendarDate } from "./calendarDate.js";
+import { answersToDraftItems } from "./adminGameDraft.js";
 
 export const ADMIN_ACCESS = {
   AUTHORIZED: "authorized",
@@ -83,4 +84,48 @@ export async function getAdminGameSchedule(supabase) {
   }
 
   return { data: games, error: null };
+}
+
+export async function getAdminGame(supabase, date) {
+  if (!isCalendarDate(date)) {
+    return { data: null, error: new Error("Invalid daily-game date.") };
+  }
+
+  const { data, error } = await supabase.rpc("get_admin_daily_game", {
+    requested_date: date,
+  });
+
+  if (error) return { data: null, error };
+  if (!data || data.length === 0) return { data: null, error: null };
+  if (data.length !== 1) {
+    return {
+      data: null,
+      error: new Error("Multiple daily games were returned for one date."),
+    };
+  }
+
+  const row = data[0];
+  const items = answersToDraftItems(row.answers);
+  const topic = typeof row.topic === "string" ? row.topic : "";
+
+  if (
+    !isCalendarDate(row.date) ||
+    !["draft", "published"].includes(row.status) ||
+    !items
+  ) {
+    return {
+      data: null,
+      error: new Error("The daily game contains invalid editor data."),
+    };
+  }
+
+  return {
+    data: {
+      date: row.date,
+      topic,
+      status: row.status,
+      items,
+    },
+    error: null,
+  };
 }

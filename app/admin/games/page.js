@@ -1,109 +1,28 @@
 import Link from "next/link";
 
 import Header from "@/components/Header";
-import {
-  ADMIN_ACCESS,
-  getAdminGameSchedule,
-  resolveAdminAccess,
-} from "@/lib/adminGames";
-import { createSupabaseServerClient } from "@/lib/supabaseServerClient";
+import { ADMIN_ACCESS, getAdminGameSchedule } from "@/lib/adminGames";
+import { getAdminServerContext } from "@/lib/adminServer";
 
-export const dynamic = "force-dynamic";
+import AdminAccessState from "./AdminAccessState";
+import AdminState from "./AdminState";
 
-export const metadata = {
-  title: "Game administration | Unconfigure",
-};
-
-function logAdminError(message, error, userId) {
-  const details = [
-    userId ? `user=${userId}` : null,
-    error?.code ? `code=${error.code}` : null,
-    error?.message ? `message=${error.message}` : "message=Unknown error",
-    error?.details ? `details=${error.details}` : null,
-    error?.hint ? `hint=${error.hint}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  console.error(`${message} ${details}`);
-}
-
-function AdminState({ title, children }) {
-  return (
-    <main className="w-full max-w-2xl mx-auto py-8">
-      <h1 className="text-xl font-bold text-neutral-100">{title}</h1>
-      <div className="mt-4 rounded-md border border-neutral-700 p-4 text-sm text-neutral-300">
-        {children}
-      </div>
-      <Link
-        href="/"
-        className="mt-6 inline-block text-sm text-neutral-400 underline hover:text-neutral-200"
-      >
-        Return to the game
-      </Link>
-    </main>
+function logScheduleError(error) {
+  console.error(
+    `[admin-games] Failed to load game schedule code=${error?.code ?? "unknown"} message=${error?.message ?? "Unknown error"}`
   );
 }
 
 export default async function AdminGamesPage() {
-  let supabase;
-  let access;
-
-  try {
-    supabase = await createSupabaseServerClient();
-    access = await resolveAdminAccess(supabase);
-  } catch (error) {
-    logAdminError(
-      "[admin-games] Failed to resolve administrator access",
-      error
-    );
-    access = { status: ADMIN_ACCESS.ERROR };
-  }
-
-  if (access.status === ADMIN_ACCESS.SIGNED_OUT) {
-    return (
-      <>
-        <Header />
-        <AdminState title="Administrator sign-in required">
-          Sign in from the main game, then return to this page.
-        </AdminState>
-      </>
-    );
-  }
-
-  if (access.status === ADMIN_ACCESS.UNAUTHORIZED) {
-    return (
-      <>
-        <Header />
-        <AdminState title="Access denied">
-          Your account does not have permission to manage daily games.
-        </AdminState>
-      </>
-    );
-  }
-
-  if (access.status === ADMIN_ACCESS.ERROR) {
-    if (access.error) {
-      logAdminError(
-        "[admin-games] Administrator access check failed",
-        access.error,
-        access.user?.id
-      );
-    }
-
-    return (
-      <>
-        <Header />
-        <AdminState title="Administration unavailable">
-          Administrator access could not be verified. Please try again.
-        </AdminState>
-      </>
-    );
+  const context = await getAdminServerContext();
+  if (context.access.status !== ADMIN_ACCESS.AUTHORIZED) {
+    return <AdminAccessState access={context.access} />;
   }
 
   let schedule;
+
   try {
-    schedule = await getAdminGameSchedule(supabase);
+    schedule = await getAdminGameSchedule(context.supabase);
   } catch (error) {
     schedule = {
       data: null,
@@ -112,12 +31,7 @@ export default async function AdminGamesPage() {
   }
 
   if (schedule.error) {
-    logAdminError(
-      "[admin-games] Failed to load game schedule",
-      schedule.error,
-      access.user.id
-    );
-
+    logScheduleError(schedule.error);
     return (
       <>
         <Header />
@@ -144,9 +58,17 @@ export default async function AdminGamesPage() {
             </p>
             <h1 className="text-2xl font-bold text-neutral-100">Daily games</h1>
           </div>
-          <p className="text-sm text-neutral-400">
-            {publishedCount} published · {draftCount} draft
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-neutral-400">
+              {publishedCount} published · {draftCount} draft
+            </p>
+            <Link
+              href="/admin/games/new"
+              className="rounded-md bg-blue-900 px-3 py-2 text-sm text-white hover:bg-blue-800"
+            >
+              New draft
+            </Link>
+          </div>
         </div>
 
         {schedule.data.length === 0 ? (
@@ -182,6 +104,14 @@ export default async function AdminGamesPage() {
                     >
                       {game.status}
                     </span>
+                    {game.status === "draft" && (
+                      <Link
+                        href={`/admin/games/${game.date}`}
+                        className="rounded border border-neutral-600 px-2 py-1 text-neutral-200 hover:border-neutral-400"
+                      >
+                        Edit
+                      </Link>
+                    )}
                   </div>
                 </li>
               ))}
