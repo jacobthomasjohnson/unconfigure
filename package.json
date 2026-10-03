@@ -19,7 +19,7 @@
         "canvas-confetti": "^1.9.3",
         "lucide-react": "^0.508.0",
         "motion": "^12.12.1",
-        "next": "15.3.0",
+        "next": "15.5.27",
         "react": "^19.0.0",
         "react-day-picker": "^9.7.0",
         "react-dom": "^19.0.0",
@@ -31,7 +31,11 @@
         "@eslint/eslintrc": "^3",
         "@tailwindcss/postcss": "^4",
         "eslint": "^9",
-        "eslint-config-next": "15.3.0",
+        "eslint-config-next": "15.5.27",
         "tailwindcss": "^4"
+    },
+    "allowScripts": {
+        "@tailwindcss/oxide@4.1.7": true,
+        "unrs-resolver@1.7.2": true
     }
 }
