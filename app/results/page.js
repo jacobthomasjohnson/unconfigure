@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import DateSelector from "@/components/DateSelector";
 import { usePlayerIdentity } from "@/hooks/usePlayerIdentity";
+import { getCurrentGameDate } from "@/lib/calendarDate";
 import { isCompletedProgress } from "@/lib/progress";
 import {
   listAnonymousProgress,
@@ -146,7 +147,7 @@ export default function ResultsPage() {
               selectedDate={selectedDate}
               setSelectedDate={setSelectedDate}
               minDate="2025-05-21"
-              maxDate={new Date().toISOString().split("T")[0]}
+              maxDate={getCurrentGameDate()}
             />
           </div>
           <button

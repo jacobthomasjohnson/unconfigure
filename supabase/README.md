@@ -52,3 +52,8 @@ update public.daily_games
 set status = 'published'
 where date = 'YYYY-MM-DD';
 ```
+
+`202610030004_normalize_game_progress_dates.sql` converts progress dates to
+PostgreSQL's native `date` type. Application APIs continue to exchange these
+calendar values as canonical `YYYY-MM-DD` strings. The migration fails on an
+invalid legacy value so malformed progress is not silently reassigned.

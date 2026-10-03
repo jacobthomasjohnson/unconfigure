@@ -14,11 +14,10 @@ import useStore from "./store/store";
 import { supabase } from "@/lib/supabaseClient";
 import generateEmojiResult from "@/utils/generateEmoji";
 import { usePlayerIdentity } from "@/hooks/usePlayerIdentity";
-import { getCurrentGameDate } from "@/lib/dailyGame";
+import { getCurrentGameDate, isCalendarDate } from "@/lib/calendarDate";
 import {
   choosePreferredProgress,
   createProgress,
-  isCalendarDate,
   isCompletedProgress,
 } from "@/lib/progress";
 import {

@@ -7,10 +7,3 @@ export function shuffle(arr) {
       }
       return a
 }
-
-// Validates if a date is within the allowed game range
-export function isValidGameDate(dateString) {
-      const today = new Date().toISOString().split('T')[0]
-      const firstGameDate = '2025-05-21'
-      return dateString >= firstGameDate && dateString <= today
-}
