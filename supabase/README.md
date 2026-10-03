@@ -25,3 +25,30 @@ in `America/Chicago`, preventing public clients from downloading future
 answers. For a no-downtime rollout, deploy the application route first, then
 apply this migration; the route has a temporary fallback for the pre-migration
 schema.
+
+`202610030003_add_daily_game_publication_states.sql` introduces explicit
+`draft` and `published` states. Existing rows are backfilled to `published`,
+while new rows default to `draft`. Drafts may be incomplete, but changing a
+game to `published` succeeds only when it has a topic and exactly eight unique
+integer chronology values. The public game function returns only published
+games dated on or before the current date, so an unpublished game is
+indistinguishable from a missing game to players.
+
+The publication-content constraint is introduced as `NOT VALID` so legacy
+scheduled games remain available even if they predate the stricter rules. The
+constraint still applies to every newly inserted or updated row. After legacy
+content has been audited and corrected, finish the rollout with:
+
+```sql
+alter table public.daily_games
+  validate constraint daily_games_published_content_check;
+```
+
+Apply this migration before creating new games that rely on the `draft`
+default. Publishing is currently an administrative database operation:
+
+```sql
+update public.daily_games
+set status = 'published'
+where date = 'YYYY-MM-DD';
+```
