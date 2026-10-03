@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   ADMIN_ACCESS,
+  getAdminGame,
   getAdminGameSchedule,
   resolveAdminAccess,
 } from "../app/lib/adminGames.js";
@@ -142,4 +143,42 @@ test("rejects malformed administrator schedule rows", async () => {
 
   assert.equal(result.data, null);
   assert.match(result.error.message, /invalid data/);
+});
+
+test("normalizes one admin game for draft editing", async () => {
+  const client = supabaseClient({
+    rpc: {
+      get_admin_daily_game: {
+        data: [
+          {
+            date: "2026-10-04",
+            topic: "Tomorrow",
+            status: "draft",
+            answers: { Later: "2000", Earlier: "1900" },
+          },
+        ],
+        error: null,
+      },
+    },
+  });
+
+  const result = await getAdminGame(client, "2026-10-04");
+
+  assert.equal(result.error, null);
+  assert.equal(result.data.items.length, 8);
+  assert.deepEqual(result.data.items[0], {
+    label: "Earlier",
+    chronology: "1900",
+  });
+  assert.deepEqual(client.calls, ["get_admin_daily_game"]);
+});
+
+test("does not query an invalid admin game date", async () => {
+  const client = supabaseClient();
+
+  const result = await getAdminGame(client, "2026-02-30");
+
+  assert.equal(result.data, null);
+  assert.match(result.error.message, /Invalid daily-game date/);
+  assert.deepEqual(client.calls, []);
 });

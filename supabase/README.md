@@ -77,3 +77,9 @@ management workflow exists.
 `202610030006_fix_admin_game_item_count.sql` keeps the same protected schedule
 contract while using `jsonb_each` to calculate item counts for compatibility
 with the linked PostgreSQL instance.
+
+`202610030007_add_admin_draft_writes.sql` adds administrator-only functions to
+create, update, and retrieve drafts. Direct writes to `daily_games` remain
+revoked. Drafts may be incomplete, but their populated items must have unique
+labels and integer chronology values. Published rows cannot be modified by the
+draft update function.
