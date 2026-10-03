@@ -1,5 +1,6 @@
 -- A daily date must identify at most one game.
 alter table public.daily_games
+  alter column date type date using date::date,
   alter column date set not null;
 
 create unique index if not exists daily_games_date_key
@@ -20,7 +21,7 @@ set search_path = ''
 as $$
   select
     daily_game.date,
-    daily_game.topic,
+    daily_game.topic::text,
     daily_game.answers::jsonb
   from public.daily_games as daily_game
   where daily_game.date = requested_date
