@@ -3,14 +3,25 @@
 import { useState } from 'react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/dist/style.css'
+import {
+      calendarDateToLocalDate,
+      localDateToCalendarDate,
+} from '@/lib/calendarDate'
 
 export default function DateSelector({ selectedDate, setSelectedDate, minDate, maxDate }) {
       const [open, setOpen] = useState(false)
 
       const handleDayClick = (day) => {
-            setSelectedDate(day.toISOString().split('T')[0])
+            const calendarDate = localDateToCalendarDate(day)
+            if (!calendarDate) return
+
+            setSelectedDate(calendarDate)
             setOpen(false)
       }
+
+      const selected = calendarDateToLocalDate(selectedDate)
+      const minimum = calendarDateToLocalDate(minDate)
+      const maximum = calendarDateToLocalDate(maxDate)
 
       return (
             <div className="relative">
@@ -26,13 +37,11 @@ export default function DateSelector({ selectedDate, setSelectedDate, minDate, m
                               <DayPicker
                                     mode="single"
                                     numberOfMonths={1}
-                                    selected={selectedDate ? new Date(selectedDate) : undefined}
+                                    selected={selected ?? undefined}
                                     onDayClick={handleDayClick}
                                     disabled={[
-                                          {
-                                                before: new Date(minDate),
-                                                after: new Date(maxDate),
-                                          },
+                                          ...(minimum ? [{ before: minimum }] : []),
+                                          ...(maximum ? [{ after: maximum }] : []),
                                     ]}
                                     captionLayout="dropdown"
                                     classNames={{

@@ -1,21 +1,7 @@
 import { MAX_GUESSES } from "../utils/constants.js";
+import { isCalendarDate } from "./calendarDate.js";
 
 export const PROGRESS_RESULTS = ["in_progress", "win", "lose"];
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-export function isCalendarDate(value) {
-  if (typeof value !== "string" || !DATE_PATTERN.test(value)) return false;
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
 
 function parseJsonArray(value) {
   if (Array.isArray(value)) return value;

@@ -1,18 +1,4 @@
-import { isCalendarDate } from "./progress.js";
-
-export const GAME_TIME_ZONE = "America/Chicago";
-
-export function getCurrentGameDate(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: GAME_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
-
-  return `${values.year}-${values.month}-${values.day}`;
-}
+import { isCalendarDate } from "./calendarDate.js";
 
 export function normalizeDailyGame(row) {
   if (!row || !isCalendarDate(row.date)) return null;

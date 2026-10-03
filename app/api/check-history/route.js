@@ -1,5 +1,5 @@
 import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
-import { isCalendarDate } from "@/lib/progress";
+import { isCalendarDate } from "@/lib/calendarDate";
 
 export async function POST(request) {
   const auth = await requireAuthenticatedUser();

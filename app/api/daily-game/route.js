@@ -1,9 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabaseServerClient";
-import {
-  getCurrentGameDate,
-  normalizeDailyGame,
-} from "@/lib/dailyGame";
-import { isCalendarDate } from "@/lib/progress";
+import { getCurrentGameDate, isCalendarDate } from "@/lib/calendarDate";
+import { normalizeDailyGame } from "@/lib/dailyGame";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
-import { isCalendarDate, normalizeProgress } from "@/lib/progress";
+import { isCalendarDate } from "@/lib/calendarDate";
+import { normalizeProgress } from "@/lib/progress";
 
 export async function GET(request) {
   const date = new URL(request.url).searchParams.get("date");

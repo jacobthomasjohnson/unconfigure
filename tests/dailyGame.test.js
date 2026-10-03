@@ -2,8 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  GAME_TIME_ZONE,
-  getCurrentGameDate,
   normalizeDailyGame,
 } from "../app/lib/dailyGame.js";
 
@@ -24,14 +22,6 @@ function game(overrides = {}) {
     ...overrides,
   };
 }
-
-test("uses the product timezone for the active calendar date", () => {
-  assert.equal(GAME_TIME_ZONE, "America/Chicago");
-  assert.equal(
-    getCurrentGameDate(new Date("2026-10-04T02:00:00.000Z")),
-    "2026-10-03"
-  );
-});
 
 test("normalizes a daily game into the UI contract", () => {
   const normalized = normalizeDailyGame(game());
