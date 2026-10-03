@@ -14,6 +14,20 @@ export const metadata = {
   title: "Game administration | Unconfigure",
 };
 
+function logAdminError(message, error, userId) {
+  const details = [
+    userId ? `user=${userId}` : null,
+    error?.code ? `code=${error.code}` : null,
+    error?.message ? `message=${error.message}` : "message=Unknown error",
+    error?.details ? `details=${error.details}` : null,
+    error?.hint ? `hint=${error.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  console.error(`${message} ${details}`);
+}
+
 function AdminState({ title, children }) {
   return (
     <main className="w-full max-w-2xl mx-auto py-8">
@@ -39,9 +53,10 @@ export default async function AdminGamesPage() {
     supabase = await createSupabaseServerClient();
     access = await resolveAdminAccess(supabase);
   } catch (error) {
-    console.error("[admin-games] Failed to resolve administrator access", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    logAdminError(
+      "[admin-games] Failed to resolve administrator access",
+      error
+    );
     access = { status: ADMIN_ACCESS.ERROR };
   }
 
@@ -69,10 +84,11 @@ export default async function AdminGamesPage() {
 
   if (access.status === ADMIN_ACCESS.ERROR) {
     if (access.error) {
-      console.error("[admin-games] Administrator access check failed", {
-        userId: access.user?.id,
-        error: access.error.message,
-      });
+      logAdminError(
+        "[admin-games] Administrator access check failed",
+        access.error,
+        access.user?.id
+      );
     }
 
     return (
@@ -96,10 +112,11 @@ export default async function AdminGamesPage() {
   }
 
   if (schedule.error) {
-    console.error("[admin-games] Failed to load game schedule", {
-      userId: access.user.id,
-      error: schedule.error.message,
-    });
+    logAdminError(
+      "[admin-games] Failed to load game schedule",
+      schedule.error,
+      access.user.id
+    );
 
     return (
       <>

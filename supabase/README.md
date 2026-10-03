@@ -73,3 +73,7 @@ values ('AUTH-USER-UUID');
 Do not use an email address as the authorization key. Additional administrators
 must be added through a trusted database operation until a dedicated role
 management workflow exists.
+
+`202610030006_fix_admin_game_item_count.sql` keeps the same protected schedule
+contract while using `jsonb_each` to calculate item counts for compatibility
+with the linked PostgreSQL instance.
