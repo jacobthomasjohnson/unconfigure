@@ -2,17 +2,11 @@
 const nextConfig = {
   trailingSlash: true,
   images: {
-    unoptimized: true
-  },
-  eslint: {
-    ignoreDuringBuilds: true // ✅ Don't block build on lint
+    unoptimized: true,
   },
   typescript: {
-    ignoreBuildErrors: true // ✅ Don't block build on TS errors (safe if you're not using TS)
+    ignoreBuildErrors: true,
   },
-  experimental: {
-    // serverActions: false // ✅ (just in case it's enabled)
-  }
-}
+};
 
-export default nextConfig
+export default nextConfig;
