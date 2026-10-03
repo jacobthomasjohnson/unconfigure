@@ -57,3 +57,23 @@ where date = 'YYYY-MM-DD';
 PostgreSQL's native `date` type. Application APIs continue to exchange these
 calendar values as canonical `YYYY-MM-DD` strings. The migration fails on an
 invalid legacy value so malformed progress is not silently reassigned.
+
+`202610030005_create_admin_game_access.sql` creates the private
+`admin_users` membership table and two authenticated functions used by the
+read-only `/admin/games` foundation. The schedule function returns dates,
+topics, publication states, and item counts, but never game answers.
+
+Bootstrap the first administrator using their stable Supabase auth user ID:
+
+```sql
+insert into public.admin_users (user_id)
+values ('AUTH-USER-UUID');
+```
+
+Do not use an email address as the authorization key. Additional administrators
+must be added through a trusted database operation until a dedicated role
+management workflow exists.
+
+`202610030006_fix_admin_game_item_count.sql` keeps the same protected schedule
+contract while using `jsonb_each` to calculate item counts for compatibility
+with the linked PostgreSQL instance.
