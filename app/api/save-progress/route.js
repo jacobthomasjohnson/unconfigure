@@ -5,6 +5,7 @@ import {
   toProgressRow,
   validateProgressInput,
 } from "@/lib/progress";
+import { resolveProgressGame } from "@/lib/progressGame";
 
 export async function POST(request) {
   const auth = await requireAuthenticatedUser();
@@ -34,33 +35,55 @@ export async function POST(request) {
   }
 
   const { supabase, user } = auth;
+  const resolved = await resolveProgressGame(supabase, validation.progress);
+  if (resolved.error) {
+    console.warn("[progress] Rejected progress for an unavailable game", {
+      userId: user.id,
+      gameId: validation.progress.gameId,
+      date: validation.progress.date,
+    });
+    return Response.json(
+      { error: "Progress must reference an available game." },
+      { status: 400 }
+    );
+  }
+
+  const incoming = {
+    ...validation.progress,
+    gameId: resolved.game.id,
+    date: resolved.game.date,
+  };
   const { data: existingRow, error: readError } = await supabase
     .from("game_progress")
     .select(
-      "date, result, attempts, guesses, emoji_results, final_guess, updated_at"
+      "game_id, date, result, attempts, guesses, emoji_results, final_guess, updated_at"
     )
     .eq("user_id", user.id)
-    .eq("date", validation.progress.date)
+    .eq("game_id", incoming.gameId)
     .maybeSingle();
 
   if (readError) {
     console.error("[progress] Failed to read existing progress", {
       userId: user.id,
-      date: validation.progress.date,
+      gameId: incoming.gameId,
+      date: incoming.date,
       error: readError.message,
     });
     return Response.json({ error: "Could not read progress." }, { status: 500 });
   }
 
   const existing = normalizeProgress(existingRow);
-  const progress = choosePreferredProgress(existing, validation.progress);
+  const progress = choosePreferredProgress(existing, incoming);
   const { error: writeError } = await supabase
     .from("game_progress")
-    .upsert(toProgressRow(user.id, progress), { onConflict: "user_id,date" });
+    .upsert(toProgressRow(user.id, progress), {
+      onConflict: "user_id,game_id",
+    });
 
   if (writeError) {
     console.error("[progress] Failed to save progress", {
       userId: user.id,
+      gameId: progress.gameId,
       date: progress.date,
       error: writeError.message,
     });

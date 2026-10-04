@@ -1,15 +1,16 @@
 import { normalizeProgress } from "./progress.js";
 
-const ANONYMOUS_PREFIX = "progress:anonymous:";
-const ACCOUNT_PREFIX = "progress:account:";
+const ANONYMOUS_PREFIX = "progress:v2:anonymous:";
+const ACCOUNT_PREFIX = "progress:v2:account:";
+const LEGACY_ANONYMOUS_PREFIX = "progress:anonymous:";
 const LEGACY_PREFIX = "progress-";
 
-export function anonymousProgressKey(anonymousId, date) {
-  return `${ANONYMOUS_PREFIX}${anonymousId}:${date}`;
+export function anonymousProgressKey(anonymousId, gameId) {
+  return `${ANONYMOUS_PREFIX}${anonymousId}:${gameId}`;
 }
 
-export function accountProgressKey(userId, date) {
-  return `${ACCOUNT_PREFIX}${userId}:${date}`;
+export function accountProgressKey(userId, gameId) {
+  return `${ACCOUNT_PREFIX}${userId}:${gameId}`;
 }
 
 export function readStoredProgress(storage, key, fallbackDate = null) {
@@ -34,20 +35,24 @@ export function removeStoredProgress(storage, key) {
 export function listAnonymousProgress(storage, anonymousId) {
   const entries = [];
   const scopedPrefix = `${ANONYMOUS_PREFIX}${anonymousId}:`;
+  const legacyScopedPrefix = `${LEGACY_ANONYMOUS_PREFIX}${anonymousId}:`;
 
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
     if (!key) continue;
 
-    let date = null;
+    let fallbackDate = null;
     if (key.startsWith(scopedPrefix)) {
-      date = key.slice(scopedPrefix.length);
+      // Current records contain both gameId and date in their value.
+    } else if (key.startsWith(legacyScopedPrefix)) {
+      fallbackDate = key.slice(legacyScopedPrefix.length);
     } else if (key.startsWith(LEGACY_PREFIX)) {
-      date = key.slice(LEGACY_PREFIX.length);
+      fallbackDate = key.slice(LEGACY_PREFIX.length);
+    } else {
+      continue;
     }
 
-    if (!date) continue;
-    const progress = readStoredProgress(storage, key, date);
+    const progress = readStoredProgress(storage, key, fallbackDate);
     if (progress) entries.push({ key, progress });
   }
 

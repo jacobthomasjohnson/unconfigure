@@ -3,6 +3,13 @@ import { isCalendarDate } from "./calendarDate.js";
 
 export const PROGRESS_RESULTS = ["in_progress", "win", "lose"];
 
+export function isGameId(value) {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
 function parseJsonArray(value) {
   if (Array.isArray(value)) return value;
   if (typeof value !== "string") return [];
@@ -30,6 +37,9 @@ export function normalizeProgress(value, fallbackDate = null) {
   const date = value.date ?? fallbackDate;
   if (!isCalendarDate(date)) return null;
 
+  const rawGameId = value.gameId ?? value.game_id ?? null;
+  const gameId = isGameId(rawGameId) ? rawGameId : null;
+
   const guesses = parseJsonArray(value.guesses)
     .map(normalizeGuess)
     .filter(Boolean);
@@ -53,6 +63,7 @@ export function normalizeProgress(value, fallbackDate = null) {
     : inferredResult;
 
   return {
+    gameId,
     date,
     result,
     attempts,
@@ -67,6 +78,7 @@ export function normalizeProgress(value, fallbackDate = null) {
 }
 
 export function createProgress({
+  gameId,
   date,
   items,
   guesses,
@@ -74,6 +86,7 @@ export function createProgress({
   result,
 }) {
   return normalizeProgress({
+    gameId,
     date,
     result,
     attempts: guesses.length,
@@ -112,6 +125,13 @@ export function validateProgressInput(value) {
 
   if (!progress) {
     return { error: "Progress must include a valid date." };
+  }
+
+  if (
+    (Object.hasOwn(value, "gameId") || Object.hasOwn(value, "game_id")) &&
+    !progress.gameId
+  ) {
+    return { error: "Progress has an invalid game ID." };
   }
 
   if (!PROGRESS_RESULTS.includes(value.result)) {
@@ -165,6 +185,7 @@ export function validateProgressInput(value) {
 export function toProgressRow(userId, progress) {
   return {
     user_id: userId,
+    game_id: progress.gameId,
     date: progress.date,
     result: progress.result,
     attempts: progress.attempts,

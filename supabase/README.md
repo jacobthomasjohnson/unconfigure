@@ -83,3 +83,11 @@ create, update, and retrieve drafts. Direct writes to `daily_games` remain
 revoked. Drafts may be incomplete, but their populated items must have unique
 labels and integer chronology values. Published rows cannot be modified by the
 draft update function.
+
+`202610040001_reference_progress_by_game_id.sql` gives every daily game a
+stable UUID and relates player progress to it with a foreign key and a unique
+`(user_id, game_id)` index. The existing progress date is retained as
+validated display metadata during the compatibility window; a trigger fills
+either identifier for older clients and rejects mismatched ID/date pairs. Any
+legacy progress that does not match a game is preserved in a private
+`game_progress_game_quarantine` table.

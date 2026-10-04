@@ -17,6 +17,7 @@ import {
 
 function progress(overrides = {}) {
   return {
+    gameId: "11111111-1111-4111-8111-111111111111",
     date: "2026-10-03",
     result: "in_progress",
     attempts: 1,
@@ -97,6 +98,10 @@ test("newer progress wins when completion and attempt counts match", () => {
 test("rejects malformed progress fields at the contract edge", () => {
   assert.equal(validateProgressInput(progress()).error, undefined);
   assert.match(
+    validateProgressInput({ ...progress(), gameId: "not-a-uuid" }).error,
+    /game ID/
+  );
+  assert.match(
     validateProgressInput({ ...progress(), guesses: "not-an-array" }).error,
     /arrays/
   );
@@ -131,7 +136,10 @@ test("storage keys isolate anonymous and authenticated identities", () => {
 
 test("anonymous progress listing includes scoped and legacy records", () => {
   const storage = memoryStorage();
-  const scopedKey = anonymousProgressKey("anon-a", "2026-10-03");
+  const scopedKey = anonymousProgressKey(
+    "anon-a",
+    "11111111-1111-4111-8111-111111111111"
+  );
   writeStoredProgress(storage, scopedKey, progress());
   storage.setItem(
     "progress-2026-10-02",
@@ -142,8 +150,14 @@ test("anonymous progress listing includes scoped and legacy records", () => {
   );
   writeStoredProgress(
     storage,
-    anonymousProgressKey("anon-b", "2026-10-01"),
-    progress({ date: "2026-10-01" })
+    anonymousProgressKey(
+      "anon-b",
+      "22222222-2222-4222-8222-222222222222"
+    ),
+    progress({
+      gameId: "22222222-2222-4222-8222-222222222222",
+      date: "2026-10-01",
+    })
   );
 
   const entries = listAnonymousProgress(storage, "anon-a");
@@ -156,13 +170,22 @@ test("anonymous progress listing includes scoped and legacy records", () => {
 
 test("migration removes local progress only after the server accepts it", async () => {
   const storage = memoryStorage();
-  const acceptedKey = anonymousProgressKey("anon-a", "2026-10-03");
-  const rejectedKey = anonymousProgressKey("anon-a", "2026-10-02");
+  const acceptedKey = anonymousProgressKey(
+    "anon-a",
+    "11111111-1111-4111-8111-111111111111"
+  );
+  const rejectedKey = anonymousProgressKey(
+    "anon-a",
+    "22222222-2222-4222-8222-222222222222"
+  );
   writeStoredProgress(storage, acceptedKey, progress());
   writeStoredProgress(
     storage,
     rejectedKey,
-    progress({ date: "2026-10-02" })
+    progress({
+      gameId: "22222222-2222-4222-8222-222222222222",
+      date: "2026-10-02",
+    })
   );
 
   const result = await migrateAnonymousProgress(

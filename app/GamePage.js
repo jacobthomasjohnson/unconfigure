@@ -40,10 +40,11 @@ export default function UnorderPage() {
   const identity = usePlayerIdentity();
   const isSignedIn = identity.status === "authenticated";
   const userId = identity.user?.id ?? null;
-  const progressKey = isSignedIn
-    ? accountProgressKey(userId, today)
-    : identity.anonymousId
-      ? anonymousProgressKey(identity.anonymousId, today)
+  const [gameId, setGameId] = useState(null);
+  const progressKey = gameId && isSignedIn
+    ? accountProgressKey(userId, gameId)
+    : gameId && identity.anonymousId
+      ? anonymousProgressKey(identity.anonymousId, gameId)
       : null;
 
   const [dateIsValid, setDateIsValid] = useState(false);
@@ -81,11 +82,12 @@ export default function UnorderPage() {
   useEffect(() => {
     const identityReady =
       identity.status === "anonymous" || identity.status === "authenticated";
-    if (!dateIsValid || !identityReady || !progressKey) return;
+    if (!dateIsValid || !identityReady) return;
 
     const fetchGame = async () => {
       try {
         setGameStatus("loading");
+        setGameId(null);
         const gameResponse = await fetch(
           `/api/daily-game/?date=${encodeURIComponent(today)}`,
           { cache: "no-store" }
@@ -106,10 +108,14 @@ export default function UnorderPage() {
         }
 
         const game = gameBody.data;
+        const loadedProgressKey = isSignedIn
+          ? accountProgressKey(userId, game.id)
+          : anonymousProgressKey(identity.anonymousId, game.id);
 
         const cleaned = game.itemDates;
         const sorted = game.items;
 
+        setGameId(game.id);
         setCorrectOrder(sorted);
         setInventionDates(cleaned);
         setGameStatus("available");
@@ -133,7 +139,8 @@ export default function UnorderPage() {
           }
 
           try {
-            const res = await fetch(`/api/get-progress/?date=${today}`);
+            const gameId = encodeURIComponent(game.id);
+            const res = await fetch(`/api/get-progress/?gameId=${gameId}`);
             const body = await res.json();
             if (res.ok) serverProgress = body.data;
           } catch (fetchErr) {
@@ -143,16 +150,38 @@ export default function UnorderPage() {
 
         let localProgress = readStoredProgress(
           localStorage,
-          progressKey,
+          loadedProgressKey,
           today
         );
 
-        if (!isSignedIn && !localProgress) {
-          const legacyKey = `progress-${today}`;
-          localProgress = readStoredProgress(localStorage, legacyKey, today);
-          if (localProgress) {
-            writeStoredProgress(localStorage, progressKey, localProgress);
-            removeStoredProgress(localStorage, legacyKey);
+        if (!localProgress) {
+          const legacyKeys = isSignedIn
+            ? [`progress:account:${userId}:${today}`]
+            : [
+                `progress:anonymous:${identity.anonymousId}:${today}`,
+                `progress-${today}`,
+              ];
+
+          for (const legacyKey of legacyKeys) {
+            const legacyProgress = readStoredProgress(
+              localStorage,
+              legacyKey,
+              today
+            );
+            if (legacyProgress) {
+              localProgress = {
+                ...legacyProgress,
+                gameId: game.id,
+                date: game.date,
+              };
+              writeStoredProgress(
+                localStorage,
+                loadedProgressKey,
+                localProgress
+              );
+              removeStoredProgress(localStorage, legacyKey);
+              break;
+            }
           }
         }
 
@@ -205,9 +234,9 @@ export default function UnorderPage() {
     identity.anonymousId,
     identity.status,
     isSignedIn,
-    progressKey,
     replay,
     today,
+    userId,
   ]);
 
   useEffect(() => {
@@ -246,6 +275,7 @@ export default function UnorderPage() {
           ? "lose"
           : "in_progress";
       const progress = createProgress({
+        gameId,
         date: today,
         items,
         guesses: submittedGuesses,
@@ -259,6 +289,7 @@ export default function UnorderPage() {
   }, [
     correctOrder,
     gameOver,
+    gameId,
     items,
     progressKey,
     replay,
@@ -328,6 +359,7 @@ export default function UnorderPage() {
       : "in_progress";
 
     const progress = createProgress({
+      gameId,
       date: today,
       items,
       guesses: newGuesses,
@@ -505,6 +537,7 @@ export default function UnorderPage() {
                             ? "lose"
                             : "in_progress";
                         const progress = createProgress({
+                          gameId,
                           date: today,
                           items: newOrder,
                           guesses: submittedGuesses,

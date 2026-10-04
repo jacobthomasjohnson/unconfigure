@@ -35,7 +35,7 @@ export async function GET(request) {
   if (error?.code === "PGRST202") {
     const fallback = await supabase
       .from("daily_games")
-      .select("date, topic, answers")
+      .select("id, date, topic, answers")
       .eq("date", requestedDate);
     data = fallback.data;
     error = fallback.error;

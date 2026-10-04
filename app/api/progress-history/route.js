@@ -10,7 +10,7 @@ export async function GET() {
   const { data, error } = await auth.supabase
     .from("game_progress")
     .select(
-      "date, result, attempts, guesses, emoji_results, final_guess, updated_at"
+      "game_id, date, result, attempts, guesses, emoji_results, final_guess, updated_at"
     )
     .eq("user_id", auth.user.id)
     .order("date", { ascending: false });

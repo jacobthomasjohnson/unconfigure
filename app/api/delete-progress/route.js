@@ -1,15 +1,15 @@
 export const dynamic = "force-dynamic";
 
 import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
-import { isCalendarDate } from "@/lib/calendarDate";
+import { isGameId } from "@/lib/progress";
 
 export async function DELETE(request) {
   const auth = await requireAuthenticatedUser();
   if (auth.response) return auth.response;
 
-  const date = new URL(request.url).searchParams.get("date");
-  if (date !== null && !isCalendarDate(date)) {
-    return Response.json({ error: "Invalid date." }, { status: 400 });
+  const gameId = new URL(request.url).searchParams.get("gameId");
+  if (gameId !== null && !isGameId(gameId)) {
+    return Response.json({ error: "Invalid game ID." }, { status: 400 });
   }
 
   let query = auth.supabase
@@ -17,13 +17,13 @@ export async function DELETE(request) {
     .delete()
     .eq("user_id", auth.user.id);
 
-  if (date) query = query.eq("date", date);
+  if (gameId) query = query.eq("game_id", gameId);
 
   const { error } = await query;
   if (error) {
     console.error("[progress] Failed to delete progress", {
       userId: auth.user.id,
-      date,
+      gameId,
       error: error.message,
     });
     return Response.json({ error: "Could not delete progress." }, { status: 500 });
@@ -52,6 +52,6 @@ export async function POST(request) {
   }
 
   const url = new URL(request.url);
-  if (body.date) url.searchParams.set("date", body.date);
+  if (body.gameId) url.searchParams.set("gameId", body.gameId);
   return DELETE(new Request(url, { method: "DELETE", headers: request.headers }));
 }
