@@ -7,6 +7,7 @@ import {
 
 function game(overrides = {}) {
   return {
+    id: "11111111-1111-4111-8111-111111111111",
     date: "2026-10-03",
     topic: "Example topic",
     answers: {
@@ -37,9 +38,11 @@ test("normalizes a daily game into the UI contract", () => {
     "Eight",
   ]);
   assert.equal(normalized.itemDates.One, "2001");
+  assert.equal(normalized.id, "11111111-1111-4111-8111-111111111111");
 });
 
 test("rejects malformed daily games", () => {
+  assert.equal(normalizeDailyGame(game({ id: "not-a-uuid" })), null);
   assert.equal(normalizeDailyGame(game({ topic: "" })), null);
   assert.equal(
     normalizeDailyGame(game({ answers: { One: "2001" } })),

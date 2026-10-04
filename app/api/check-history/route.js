@@ -1,5 +1,5 @@
 import { requireAuthenticatedUser } from "@/lib/authenticatedProgress";
-import { isCalendarDate } from "@/lib/calendarDate";
+import { isGameId } from "@/lib/progress";
 
 export async function POST(request) {
   const auth = await requireAuthenticatedUser();
@@ -23,21 +23,21 @@ export async function POST(request) {
     );
   }
 
-  if (!isCalendarDate(body.date)) {
-    return Response.json({ error: "A valid date is required." }, { status: 400 });
+  if (!isGameId(body.gameId)) {
+    return Response.json({ error: "A valid game ID is required." }, { status: 400 });
   }
 
   const { data, error } = await auth.supabase
     .from("game_progress")
-    .select("date")
+    .select("game_id")
     .eq("user_id", auth.user.id)
-    .eq("date", body.date)
+    .eq("game_id", body.gameId)
     .limit(1);
 
   if (error) {
     console.error("[progress] Failed to check history", {
       userId: auth.user.id,
-      date: body.date,
+      gameId: body.gameId,
       error: error.message,
     });
     return Response.json({ error: "Could not check history." }, { status: 500 });

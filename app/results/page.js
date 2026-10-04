@@ -114,10 +114,10 @@ export default function ResultsPage() {
     setShowConfirmClear(false);
   };
 
-  const handleDeleteResult = async (date) => {
+  const handleDeleteResult = async (entry) => {
     if (identity.status === "authenticated") {
       const response = await fetch(
-        `/api/delete-progress/?date=${encodeURIComponent(date)}`,
+        `/api/delete-progress/?gameId=${encodeURIComponent(entry.gameId)}`,
         { method: "DELETE" }
       );
       if (!response.ok) {
@@ -126,11 +126,17 @@ export default function ResultsPage() {
       }
     } else {
       listAnonymousProgress(localStorage, identity.anonymousId)
-        .filter((entry) => entry.progress.date === date)
-        .forEach((entry) => removeStoredProgress(localStorage, entry.key));
+        .filter((stored) =>
+          entry.gameId
+            ? stored.progress.gameId === entry.gameId
+            : stored.progress.date === entry.date
+        )
+        .forEach((stored) => removeStoredProgress(localStorage, stored.key));
     }
 
-    setEntries((current) => current.filter((entry) => entry.date !== date));
+    setEntries((current) =>
+      current.filter((currentEntry) => currentEntry.gameId !== entry.gameId)
+    );
     setConfirmingDeleteDate(null);
   };
 
@@ -197,7 +203,7 @@ export default function ResultsPage() {
               <button
                 onClick={() =>
                   confirmingDeleteDate === entry.date
-                    ? handleDeleteResult(entry.date)
+                    ? handleDeleteResult(entry)
                     : setConfirmingDeleteDate(entry.date)
                 }
                 className={`text-sm text-neutral-300 border border-neutral-700 rounded p-2 transition flex gap-2 items-center justify-start ${
