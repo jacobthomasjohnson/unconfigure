@@ -3,8 +3,7 @@
 **Unconfigure** is a bite-sized daily timeline puzzle. Each day you get a shuffled list of inventions, discoveries, or cultural moments. Drag them into chronological order in as few guesses as possible.
 
 <!-- Live site: add the URL here, e.g. **Play:** https://example.com -->
-<!-- Screenshot: add public/screenshot.png, then uncomment the line below. -->
-<!-- ![Unconfigure gameplay](public/screenshot.png) -->
+<img src="docs/screenshot.png" alt="Unconfigure puzzle in progress: eight inventions to drag into chronological order, one locked in, one attempt left" width="480">
 
 ## Features
 
